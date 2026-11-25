@@ -1,0 +1,12 @@
+{
+  "name": "trepio-doll",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Trepio Doll — a tiny 3D dress-up & dance game (three.js, zero build step)",
+  "scripts": {
+    "start": "python3 -m http.server 8000 --bind 0.0.0.0"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  }
+}

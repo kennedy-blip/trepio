@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trepio Doll — Dress Up &amp; Dance</title>
+<meta name="description" content="A tiny 3D dress-up doll game: style her hair, outfits and accessories, then make her dance.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💃</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<canvas id="stage" aria-label="3D doll stage"></canvas>
+
+<div id="fallback" hidden>
+  <div>
+    <h2>WebGL unavailable 😢</h2>
+    <p>This little game needs WebGL. Try a recent Chrome, Edge, Firefox or Safari.</p>
+  </div>
+</div>
+
+<header id="hud">
+  <h1>Trepio&nbsp;Doll <span aria-hidden="true">✨</span></h1>
+  <p>dress her up &middot; make her dance</p>
+  <p class="hint">drag to orbit · scroll to zoom · tap the doll to say hi</p>
+</header>
+
+<div id="actionbar">
+  <button id="btnDance" class="action primary">💃 Dance</button>
+  <button id="btnWave" class="action">👋 Wave</button>
+  <button id="btnSpin" class="action">🌀 Spin</button>
+  <button id="btnRandom" class="action">🎲 Surprise</button>
+  <button id="btnMute" class="action icon" title="Music on/off" aria-label="Music on/off">🔊</button>
+</div>
+
+<nav id="panel" aria-label="Dress-up controls"></nav>
+
+<footer id="credit">made with 💜 — trepio</footer>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+<script type="module" src="game.js"></script>
+</body>
+</html>
