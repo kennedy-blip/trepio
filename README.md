@@ -9,14 +9,21 @@ Inspired by the "change the model's characteristics with tools" vibe of
 
 ## ▶️ Run it
 
-No build step, no CDN — everything is vendored.
+Zero-config: everything is vendored, so a plain static server works.
 
 ```bash
-python3 -m http.server 8000 --bind 0.0.0.0
+python3 -m http.server 8000 --bind 0.0.0.0   # or: npm start
 # open http://localhost:8000
 ```
 
-(or `npm start`, or deploy the folder as-is to any static host — Vercel works out of the box)
+## 🚀 Build & deploy
+
+```bash
+npm install
+npm run build     # vite build → dist/ (bundles three.js)
+```
+
+The site deploys to Vercel with the **Vite** preset (install → `vite build` → serve `dist/`).
 
 ## 🎮 Controls
 
