@@ -35,10 +35,12 @@
     <div id="charInfo"></div>
     <div class="btnrow">
       <button id="btnCustomize" class="action">✨ Customize</button>
+      <button id="btnShop2" class="action">🛍️ Boutique</button>
+      <button id="btnJournal2" class="action">📜</button>
       <button id="btnSettings" class="action">⚙️</button>
-      <button id="btnEnter" class="action primary">▶ Enter the World</button>
+      <button id="btnEnter" class="action primary">▶ Enter</button>
     </div>
-    <p class="hint">WASD / arrows to move · Space jump · drag to look · E talk · R dance</p>
+    <p class="hint">WASD / arrows to move · Space jump · E talk / enter · J journal · R dance</p>
   </div>
 </div>
 
@@ -58,6 +60,8 @@
 <div id="actionbar" class="hidden">
   <button id="btnDance" class="action primary">💃 Dance</button>
   <button id="btnTalk" class="action">💬 Talk</button>
+  <button id="btnJournal" class="action icon" title="Quest journal" aria-label="Quest journal">📜</button>
+  <button id="btnShop" class="action icon" title="Candy boutique" aria-label="Candy boutique">🛍️</button>
   <button id="btnWave" class="action">👋 Wave</button>
   <button id="btnSpin" class="action">🌀 Spin</button>
   <button id="btnJump" class="action">🤸 Jump</button>
@@ -69,8 +73,27 @@
 <!-- ============ touch joystick ============ -->
 <div id="joy"><div id="joyKnob"></div></div>
 
-<!-- ============ NPC dialogue ============ -->
+<!-- ============ NPC dialogue (with choices) ============ -->
 <div id="dialogue" aria-live="polite"></div>
+
+<!-- ============ quest journal ============ -->
+<div id="journal" class="overlay hidden">
+  <div class="sheet">
+    <h3>📜 Quest Journal</h3>
+    <div id="journalList"></div>
+    <button id="btnCloseJournal" class="action">Close</button>
+  </div>
+</div>
+
+<!-- ============ candy boutique ============ -->
+<div id="shop" class="overlay hidden">
+  <div class="sheet">
+    <h3>🛍️ Candy Boutique</h3>
+    <p id="shopBalance"></p>
+    <div id="shopList"></div>
+    <button id="btnCloseShop" class="action">Close</button>
+  </div>
+</div>
 
 <!-- ============ toast ============ -->
 <div id="toast"></div>

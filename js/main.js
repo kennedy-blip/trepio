@@ -1,7 +1,7 @@
 /* =====================================================================
-   main.js — Trepio Candy World
-   Studio (dress-up) + open candy world with maze, quests, NPCs,
-   collectibles, XP levels and unlockables.
+   main.js — Trepio Candy World 2.0 "The Living Candy World"
+   Studio + open world + maze + quests (journal & beacons) + NPC
+   dialogue with choices + candy economy + enterable castle.
    ===================================================================== */
 import * as THREE from 'three';
 import { createDoll, SKINS, HAIRC, CLOTH, EYES, SHOEC,
@@ -14,7 +14,7 @@ import { createInput } from './input.js';
 import { createProgress, LEVEL_XP } from './progress.js';
 
 /* ------------------------------------------------------------------ */
-/* Characters — each doll has different characteristics + dialogue     */
+/* Characters                                                          */
 /* ------------------------------------------------------------------ */
 const CHARACTERS = [
   {
@@ -41,6 +41,7 @@ const CHARACTERS = [
     id: 'zuri', emoji: '🌿', name: 'Zuri', title: 'Mint Ranger', gender: 'female',
     blurb: 'Quick on her feet, quickest through the lollipop forest.',
     speed: 6.2, jump: 4.2,
+    quest: { id: 'forestRamble', offer: 'Meet me by the giant lollipop in the north-west forest — it is my favourite spot!', active: 'Any luck? Head north-west, past the hills!', done: 'Best ramble ever! Told you the forest is magic.' },
     lines: ['Race you to the forest!', 'The butterflies follow me home sometimes.', 'Mint makes everything better.'],
     cfg: { hair: 'bob', hairColor: '#57b3c9', skin: '#dda273', eyes: '#2f6d8f',
       outfit: 'coord', top: '#4fc3ae', skirt: '#a7d97a',
@@ -71,6 +72,7 @@ const CHARACTERS = [
     id: 'theo', emoji: '🤴', name: 'Theo', title: 'Cocoa Prince', gender: 'male',
     blurb: 'Bold and gallant — claims the candy castle is his by right.',
     speed: 5.4, jump: 4.8,
+    quest: { id: 'princeFavor', offer: 'A task worthy of you: gather 8 candies and present them to me. You shall be rewarded.', active: 'Only {N} more candies — I shall be waiting, of course.', done: 'Magnificent! You have the favour of the prince.' },
     lines: ['That castle? Mine. Eventually.', 'A prince is never lost, merely scouting.', 'Have you paid your candy taxes?'],
     cfg: { hair: 'quiff', hairColor: '#3a2a1e', skin: '#8d5524', eyes: '#5a3420',
       outfit: 'mprince', top: '#ffd45e', skirt: '#63b8f5',
@@ -81,6 +83,7 @@ const CHARACTERS = [
     id: 'amani', emoji: '🍀', name: 'Amani', title: 'Mint Explorer', gender: 'male',
     blurb: 'Charts every trail from the rainbow to the ice cream peaks.',
     speed: 5.1, jump: 5.2,
+    quest: { id: 'peakSightseer', offer: 'I chart trails no one dares. Cross the river and gaze upon the ice cream peaks — then tell me what you see!', active: 'The peaks are north, across the chocolate river. Don\'t lick the donuts.', done: 'The peaks at sunset… you saw it too? Marvellous.' },
     lines: ['I\'m mapping a new route past the hills today.', 'The golden gummy story is TRUE, I tell you.', 'Nature, but make it candy.'],
     cfg: { hair: 'curly', hairColor: '#1a1410', skin: '#dda273', eyes: '#3f7d4e',
       outfit: 'explorer', top: '#a7d97a', skirt: '#4fc3ae',
@@ -104,13 +107,18 @@ const CHARACTERS = [
 /* ------------------------------------------------------------------ */
 const STORE_KEY = 'trepio-doll-v2';
 const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const s = JSON.parse(raw);
-      s.settings = { music: true, shadows: true, effects: !reducedMotion, ...(s.settings || {}) };
+      s.settings = { music: true, shadows: true, effects: !reducedMotion, trail: true, ...(s.settings || {}) };
+      s.purchases = s.purchases || {};
+      s.spent = s.spent || 0;
+      s.progress = s.progress || { xp: 0, candies: 0, quests: {} };
+      s.progress.collected = s.progress.collected || {};
       return s;
     }
   } catch { /* ignore */ }
@@ -118,16 +126,20 @@ function loadState() {
     character: 'trixie',
     cfgs: {},
     mode: 'studio',
-    progress: { xp: 0, candies: 0, quests: {} },
-    settings: { music: true, shadows: true, effects: !reducedMotion },
+    progress: { xp: 0, candies: 0, quests: {}, collected: {} },
+    purchases: {},
+    spent: 0,
+    settings: { music: true, shadows: true, effects: !reducedMotion, trail: true },
   };
 }
 const state = loadState();
 function save() {
   try {
+    const ser = progress.serialize();
+    ser.collected = state.progress.collected;
     localStorage.setItem(STORE_KEY, JSON.stringify({
       ...state,
-      progress: progress.serialize(),
+      progress: ser,
     }));
   } catch { /* ignore */ }
 }
@@ -137,17 +149,18 @@ function cfgFor(id) {
            gender: ch.gender,
            accessories: { ...ch.cfg.accessories, ...((state.cfgs[id] || {}).accessories || {}) } };
 }
+const candyBalance = () => Math.max(0, progress.candies - (state.spent || 0));
 
 /* ------------------------------------------------------------------ */
-/* Progress (XP / quests / candy inventory)                            */
+/* Progress                                                            */
 /* ------------------------------------------------------------------ */
-const progress = createProgress(state.progress || {});
+const progress = createProgress(state.progress);
 progress.on('levelup', (lv) => {
   toast(`🎉 Level ${lv}! New wardrobe items unlocked`, 3400);
   if (effectsOn()) effects.spawnConfetti(26, player.group.position);
   buildWardrobePanel();
 });
-progress.on('candy', () => updateStats());
+progress.on('candy', () => { updateStats(); renderShop(); });
 progress.on('quest', () => { updateTracker(); save(); });
 
 /* ------------------------------------------------------------------ */
@@ -156,12 +169,14 @@ progress.on('quest', () => { updateTracker(); save(); });
 const canvas = document.getElementById('stage');
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: !isTouch });
 } catch (e) {
   document.getElementById('fallback').hidden = false;
   throw e;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+/* device-aware quality: lower caps on touch devices */
+const maxDPR = isTouch ? 1.5 : 2;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDPR));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -170,14 +185,12 @@ renderer.shadowMap.enabled = !!state.settings.shadows;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-
 const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 260);
 
-/* lights */
 scene.add(new THREE.HemisphereLight(0xfff4ec, 0xffd9e6, 1.0));
 const key = new THREE.DirectionalLight(0xffffff, 2.3);
 key.castShadow = !!state.settings.shadows;
-key.shadow.mapSize.set(2048, 2048);
+key.shadow.mapSize.set(isTouch ? 1024 : 2048, isTouch ? 1024 : 2048);
 key.shadow.camera.left = -18; key.shadow.camera.right = 18;
 key.shadow.camera.top = 18;  key.shadow.camera.bottom = -18;
 key.shadow.camera.near = 0.5; key.shadow.camera.far = 60;
@@ -188,7 +201,6 @@ const rim = new THREE.DirectionalLight(0xffc4e0, 1.1);
 rim.position.set(-3, 2.2, -2.4);
 scene.add(rim);
 
-/* backgrounds & fog per mode */
 function bgTexture(top, bot) {
   const c = document.createElement('canvas');
   c.width = 2; c.height = 512;
@@ -207,9 +219,10 @@ const studioBg = bgTexture('#ffeaf3', '#ffd2a6');
 const worldBg = bgTexture('#bfe6ff', '#ffd9e6');
 const studioFog = new THREE.Fog(0xffd2a6, 9, 16);
 const worldFog = new THREE.Fog(0xffd9e6, 45, 130);
+const castleFog = new THREE.Fog(0xf6c7d9, 14, 30);
 
 /* ------------------------------------------------------------------ */
-/* Studio (dress-up stage)                                             */
+/* Studio stage                                                        */
 /* ------------------------------------------------------------------ */
 const studioGroup = new THREE.Group();
 scene.add(studioGroup);
@@ -230,7 +243,6 @@ scene.add(studioGroup);
   ring.position.y = 0.005;
   studioGroup.add(ring);
 
-  /* studio sparkles */
   const dot = (() => {
     const c = document.createElement('canvas');
     c.width = c.height = 64;
@@ -277,7 +289,7 @@ scene.background = studioBg;
 scene.fog = studioFog;
 
 /* ------------------------------------------------------------------ */
-/* World + effects + audio + input                                     */
+/* World / effects / audio / input                                     */
 /* ------------------------------------------------------------------ */
 const world = createWorld(scene, key);
 const effects = createEffects(scene);
@@ -286,8 +298,16 @@ music.muted = !state.settings.music;
 const input = createInput(canvas);
 const effectsOn = () => !!state.settings.effects;
 
+/* permanently collected candies (from save) */
+for (const c of world.candies) {
+  if (state.progress.collected[c.id]) {
+    c.active = false;
+    c.obj.visible = false;
+  }
+}
+
 /* ------------------------------------------------------------------ */
-/* Player doll                                                         */
+/* Player                                                              */
 /* ------------------------------------------------------------------ */
 let currentChar = CHARACTERS.find((c) => c.id === state.character) || CHARACTERS[0];
 let playerCfg = cfgFor(currentChar.id);
@@ -303,8 +323,11 @@ function rebuildPlayer(id) {
   playerCfg = cfgFor(id);
   player = createDoll(playerCfg);
   parent.add(player.group);
-  if (state.mode === 'world') {
+  if (game.mode === 'world') {
     player.group.position.copy(world.spawn);
+    player.group.rotation.y = Math.PI;
+  } else if (game.mode === 'castle') {
+    player.group.position.set(0, 0, 3.8);
     player.group.rotation.y = Math.PI;
   } else {
     player.group.position.y = 0.01;
@@ -317,7 +340,7 @@ function rebuildPlayer(id) {
 }
 
 /* ------------------------------------------------------------------ */
-/* NPC dolls wandering the world — every character except the player   */
+/* NPCs                                                                */
 /* ------------------------------------------------------------------ */
 let npcs = [];
 function rebuildNpcs() {
@@ -334,8 +357,8 @@ function rebuildNpcs() {
       const a = (i / others.length) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
       const r = 24 + Math.random() * 8;
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (Math.abs(x) < 22.5 && Math.abs(z) < 22.5) continue;   /* off the maze island */
-      if (z > 27 && z < 37) continue;                             /* off the river */
+      if (Math.abs(x) < 22.5 && Math.abs(z) < 22.5) continue;
+      if (z > 27 && z < 37) continue;
       p = new THREE.Vector3(x, 0, z);
     }
     if (!p) p = new THREE.Vector3(24, 0, 24);
@@ -360,8 +383,8 @@ function pickNpcTarget(n) {
     const a = Math.random() * Math.PI * 2;
     const r = 23 + Math.random() * 16;
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (Math.abs(x) < 22.5 && Math.abs(z) < 22.5) continue;   /* off the maze island */
-    if (z > 27) continue;                                      /* stay south of the river */
+    if (Math.abs(x) < 22.5 && Math.abs(z) < 22.5) continue;
+    if (z > 27) continue;
     n.target.set(x, 0, z);
     return;
   }
@@ -369,7 +392,7 @@ function pickNpcTarget(n) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Camera controller                                                   */
+/* Camera                                                              */
 /* ------------------------------------------------------------------ */
 const cam = {
   yaw: 0, pitch: 0.5, dist: 6,
@@ -382,7 +405,7 @@ input.onDrag((dx, dy) => {
   cam.lastUser = performance.now() / 1000;
 });
 input.onZoom((dz) => {
-  cam.dist = THREE.MathUtils.clamp(cam.dist + dz, 2.6, 14);
+  cam.dist = THREE.MathUtils.clamp(cam.dist + dz, 2.6, game.mode === 'castle' ? 5 : 14);
 });
 const _camDesired = new THREE.Vector3();
 function updateCamera(dt, auto) {
@@ -405,6 +428,7 @@ const $ = (id) => document.getElementById(id);
 const titleEl = $('title'), hudEl = $('hud'), panelEl = $('panel'), actionbarEl = $('actionbar');
 const joyEl = $('joy'), toastEl = $('toast'), statsEl = $('stats'), trackerEl = $('tracker');
 const dialogueEl = $('dialogue'), settingsEl = $('settings'), loadingEl = $('loading');
+const journalEl = $('journal'), shopEl = $('shop');
 const charRowEl = $('charRow'), charInfoEl = $('charInfo');
 
 let toastTimer = null;
@@ -415,19 +439,10 @@ function toast(msg, ms = 2600) {
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
 }
 
-let dialogueTimer = null;
-function showDialogue(name, emoji, text) {
-  dialogueEl.innerHTML = `<b>${emoji} ${name}</b><br>“${text}”`;
-  dialogueEl.classList.add('show');
-  clearTimeout(dialogueTimer);
-  dialogueTimer = setTimeout(() => dialogueEl.classList.remove('show'), 3400);
-}
-
 function updateStats() {
   const next = LEVEL_XP[progress.level] || null;
-  statsEl.innerHTML = `Lv ${progress.level} <small>· ✨ ${progress.xp}${next ? '/' + next : ''} · 🍬 ${progress.candies}</small>`;
+  statsEl.innerHTML = `Lv ${progress.level} <small>· ✨ ${progress.xp}${next ? '/' + next : ''} · 🍬 ${candyBalance()}</small>`;
 }
-
 function updateHud() {
   $('hudName').innerHTML = `${currentChar.emoji} ${currentChar.name}
     <small>${currentChar.title} · speed ${currentChar.speed.toFixed(1)} · jump ${currentChar.jump.toFixed(1)}</small>`;
@@ -437,33 +452,100 @@ function updateHud() {
 /* Quests                                                              */
 /* ------------------------------------------------------------------ */
 const QUESTS = [
-  { id: 'sweetTooth', icon: '🍬', title: 'Sweet Tooth', reward: 15,
+  { id: 'sweetTooth', icon: '🍬', title: 'Sweet Tooth', reward: 15, auto: true,
     desc: () => 'Collect 5 candies',
     prog: () => `${Math.min(progress.candies, 5)}/5 candies` },
-  { id: 'royalVisit', icon: '🏰', title: 'Royal Visit', reward: 20,
+  { id: 'royalVisit', icon: '🏰', title: 'Royal Visit', reward: 20, auto: true,
     desc: () => 'Visit the candy castle beyond the maze',
-    prog: () => 'Visit the castle' },
-  { id: 'rainbowCross', icon: '🌈', title: 'Over the Rainbow', reward: 15,
+    prog: () => 'Visit the castle',
+    target: () => world.castleDoor },
+  { id: 'rainbowCross', icon: '🌈', title: 'Over the Rainbow', reward: 15, auto: true,
     desc: () => 'Cross the chocolate river on a donut',
     prog: () => 'Cross at a donut' },
-  { id: 'goldenBear', icon: '🧸', title: 'The Lost Gummy', reward: 25,
-    desc: () => 'Find the golden gummy bear',
+  { id: 'goldenBear', icon: '🧸', title: 'The Lost Gummy', reward: 25, auto: true,
+    desc: () => 'Find the golden gummy bear behind the cream hills',
     prog: () => 'Find the golden bear' },
-  { id: 'homeSweet', icon: '🏡', title: 'Home Sweet Home', reward: 30,
+  { id: 'homeSweet', icon: '🏡', title: 'Home Sweet Home', reward: 30, auto: true,
     desc: () => (progress.questStage('homeSweet') === 1
       ? 'Meet your friend at the gumdrop village'
       : 'Talk to a friend, then meet them at the village'),
-    prog: () => (progress.questStage('homeSweet') === 1 ? 'Go to the village' : 'Talk to a friend (E)') },
+    prog: () => (progress.questStage('homeSweet') === 1 ? 'Go to the village' : 'Talk to a friend (E)'),
+    target: () => (progress.questStage('homeSweet') === 1 ? world.villagePos : null) },
+  { id: 'forestRamble', icon: '🌳', title: "Zuri's Forest Ramble", reward: 20, giver: 'zuri',
+    desc: () => 'Meet Zuri by the giant lollipop in the north-west forest',
+    prog: () => 'Reach the giant lollipop',
+    target: () => world.bigLollipop },
+  { id: 'princeFavor', icon: '👑', title: "A Prince's Favor", reward: 25, giver: 'theo',
+    desc: () => 'Gather 8 candies and present them to Theo',
+    prog: () => `${Math.min(candyBalance(), 8)}/8 candies, then talk to Theo`,
+    target: () => npcById('theo') },
+  { id: 'peakSightseer', icon: '🍦', title: "Amani's Peak Challenge", reward: 20, giver: 'amani',
+    desc: () => 'Cross the river and gaze upon the ice cream peaks',
+    prog: () => 'Travel beyond the mountains\' foothills (far north)',
+    target: () => world.peaks },
+  { id: 'royalTreasure', icon: '🗝️', title: 'The Royal Vault', reward: 30, auto: true,
+    desc: () => 'Open the treasure chest inside the candy castle',
+    prog: () => 'Open the chest in the castle',
+    target: () => world.castleDoor },
 ];
+const questGiven = (q) => q.auto || progress.questStage(q.id) !== 0;
+function npcById(id) {
+  const n = npcs.find((x) => x.ch.id === id);
+  return n ? n.doll.group.position : null;
+}
+
+function activeQuest() {
+  return QUESTS.find((q) => !progress.isQuestDone(q.id) && questGiven(q)) || null;
+}
 
 function updateTracker() {
-  if (game.mode !== 'world') { trackerEl.innerHTML = ''; return; }
-  const q = QUESTS.find((x) => !progress.isQuestDone(x.id));
+  if (game.mode !== 'world') { trackerEl.innerHTML = ''; world.setBeacon(null); return; }
+  const q = activeQuest();
   if (!q) {
     trackerEl.innerHTML = '✨ <b>All quests complete!</b>';
+    world.setBeacon(null);
     return;
   }
-  trackerEl.innerHTML = `${q.icon} <b>${q.title}</b><br><span class="tprog">${q.prog()}</span>`;
+  let dist = '';
+  if (q.target) {
+    const tp = q.target();
+    if (tp) {
+      const d = Math.round(Math.hypot(player.group.position.x - tp.x, player.group.position.z - tp.z));
+      dist = ` · ${d}m`;
+      world.setBeacon(tp.x, tp.z);
+    } else {
+      world.setBeacon(null);
+    }
+  } else {
+    world.setBeacon(null);
+  }
+  trackerEl.innerHTML = `${q.icon} <b>${q.title}</b><br><span class="tprog">${q.prog()}${dist}</span>`;
+}
+
+function renderJournal() {
+  const list = $('journalList');
+  list.innerHTML = '';
+  for (const q of QUESTS) {
+    const done = progress.isQuestDone(q.id);
+    const given = questGiven(q);
+    const row = document.createElement('div');
+    row.className = 'quest-row' + (done ? ' done' : '');
+    const st = done
+      ? '<div class="qr-state complete">✅ COMPLETE</div>'
+      : given
+        ? '<div class="qr-state active">🔄 IN PROGRESS</div>'
+        : `<div class="qr-state hint">💡 TALK TO ${nameOf(q.giver).toUpperCase()}</div>`;
+    row.innerHTML = `
+      <div class="qr-head"><span>${q.icon} ${q.title}</span><span class="qr-reward">+${q.reward} XP</span></div>
+      <div class="qr-desc">${q.desc()}</div>
+      ${given ? `<div class="qr-desc"><b>${q.prog()}</b></div>` : ''}
+      ${st}`;
+    list.appendChild(row);
+  }
+}
+function nameOf(id) {
+  const c = CHARACTERS.find((x) => x.id === id);
+  return c ? c.name : id;
 }
 
 function completeQuest(id) {
@@ -478,6 +560,7 @@ function completeQuest(id) {
   }
   updateStats();
   updateTracker();
+  renderJournal();
   save();
 }
 
@@ -485,7 +568,7 @@ const _questV = new THREE.Vector3();
 function updateQuests() {
   const p = player.group.position;
   if (!progress.isQuestDone('sweetTooth') && progress.candies >= 5) completeQuest('sweetTooth');
-  if (!progress.isQuestDone('royalVisit') && p.distanceTo(world.castlePos) < 9) completeQuest('royalVisit');
+  if (!progress.isQuestDone('royalVisit') && p.distanceTo(world.castleDoor) < 6) completeQuest('royalVisit');
   if (!progress.isQuestDone('rainbowCross')) {
     for (const d of world.donuts) {
       _questV.set(d.x, p.y, d.z);
@@ -496,10 +579,17 @@ function updateQuests() {
   if (!progress.isQuestDone('homeSweet') && progress.questStage('homeSweet') === 1 && p.distanceTo(world.villagePos) < 5) {
     completeQuest('homeSweet');
   }
+  if (!progress.isQuestDone('forestRamble') && progress.questStage('forestRamble') === 1 && p.distanceTo(world.bigLollipop) < 6) {
+    completeQuest('forestRamble');
+  }
+  if (!progress.isQuestDone('peakSightseer') && progress.questStage('peakSightseer') === 1 && p.z > 45) {
+    completeQuest('peakSightseer');
+  }
+  if (!progress.isQuestDone('royalTreasure') && world.castle.chest.opened) completeQuest('royalTreasure');
 }
 
 /* ------------------------------------------------------------------ */
-/* Character chips + info                                              */
+/* Character chips                                                     */
 /* ------------------------------------------------------------------ */
 const charBtns = CHARACTERS.map((c) => {
   const b = document.createElement('button');
@@ -519,7 +609,7 @@ function renderCharInfo() {
       <div><label>Speed</label>${bar(c.speed, 7)}</div>
       <div><label>Jump</label>${bar(c.jump, 6)}</div>
     </div>
-    <div class="ci-prog">🍬 Level ${progress.level} · ${progress.candies} candies · ${QUESTS.filter((q) => progress.isQuestDone(q.id)).length}/${QUESTS.length} quests</div>`;
+    <div class="ci-prog">🍬 Level ${progress.level} · ${candyBalance()} candies · ${QUESTS.filter((q) => progress.isQuestDone(q.id)).length}/${QUESTS.length} quests</div>`;
 }
 function selectCharacter(id) {
   if (id === currentChar.id) return;
@@ -535,7 +625,7 @@ syncCharChips();
 renderCharInfo();
 
 /* ------------------------------------------------------------------ */
-/* Wardrobe panel (studio, gender-aware, level-gated)                  */
+/* Wardrobe (gender-aware, level & boutique gating)                    */
 /* ------------------------------------------------------------------ */
 const uiSync = [];
 let TABS = [];
@@ -565,29 +655,30 @@ function swatches(colors, get, set) {
   uiSync.push(() => { for (const { b, c } of btns) b.classList.toggle('on', get() === c); });
   return wrap;
 }
+/* lock info: shop items need purchase; level items need level (or purchase) */
+function lockInfo(o) {
+  if (o.shop && !state.purchases[o.id]) return { label: `🛍️ ${o.shop} candies`, toast: `🛍️ Buy this in the <b>Candy Boutique</b>!` };
+  if (o.locked && progress.level < o.locked && !state.purchases[o.id]) return { label: `🔒 Lv ${o.locked}`, toast: `🔒 Reach <b>level ${o.locked}</b> — or buy it in the boutique!` };
+  return null;
+}
 function chips(list, get, set) {
   const wrap = el('div', 'chips');
   const btns = list.map((o) => {
-    const locked = o.locked && progress.level < o.locked;
-    const b = el('button', 'chip', locked ? `${o.label}<small>🔒 unlocks at Lv ${o.locked}</small>` : o.label);
-    if (locked) b.classList.add('locked');
+    const li = lockInfo(o);
+    const b = el('button', 'chip', li ? `${o.label}<small>${li.label}</small>` : o.label);
+    if (li) b.classList.add('locked');
     b.addEventListener('click', () => {
-      if (o.locked && progress.level < o.locked) {
-        toast(`🔒 Reach <b>level ${o.locked}</b> to unlock this item!`, 2200);
-        return;
-      }
+      if (lockInfo(o)) { toast(lockInfo(o).toast, 2400); return; }
       set(o.id);
       save();
       syncUI();
     });
     wrap.appendChild(b);
-    return { b, id: o.id, locked };
+    return { b, o };
   });
   uiSync.push(() => {
-    for (const { b, id, locked } of btns) {
-      b.classList.toggle('on', get() === id && !locked);
-      const nowLocked = locked; /* lock state changes only via level-up rebuild */
-      if (nowLocked) b.classList.remove('on');
+    for (const { b, o } of btns) {
+      b.classList.toggle('on', !lockInfo(o) && get() === o.id);
     }
   });
   return wrap;
@@ -612,7 +703,7 @@ function buildWardrobePanel() {
     { id: 'outfit', label: male ? '🤴 Outfit' : '👗 Outfit', build: () => container(
         groupLabel('Style'), chips(outfits, () => player.cfg.outfit, (v) => { player.cfg.outfit = v; player.buildBottom(); persistCfg(); }),
         groupLabel('Top'), swatches(CLOTH, () => player.cfg.top, (v) => { player.cfg.top = v; player.mats.topMat.color.set(v); persistCfg(); }),
-        groupLabel(bottomLabel), swatches(CLOTH, () => player.cfg.skirt, (v) => { player.cfg.skirt = v; if (player.cfg.outfit !== 'rainbow' && player.cfg.outfit !== 'star') player.mats.skirtMat.color.set(v); player.mats.accentMat.color.set(v); persistCfg(); })) },
+        groupLabel(bottomLabel), swatches(CLOTH, () => player.cfg.skirt, (v) => { player.cfg.skirt = v; if (!['rainbow', 'star', 'candycane'].includes(player.cfg.outfit)) player.mats.skirtMat.color.set(v); player.mats.accentMat.color.set(v); persistCfg(); })) },
     { id: 'beauty', label: '💄 Beauty', build: () => container(
         groupLabel('Skin tone'), swatches(SKINS, () => player.cfg.skin, (v) => { player.cfg.skin = v; player.mats.skinMat.color.set(v); persistCfg(); }),
         groupLabel('Eyes'), swatches(EYES, () => player.cfg.eyes, (v) => { player.cfg.eyes = v; player.mats.pupilMat.color.set(v); persistCfg(); })) },
@@ -622,22 +713,39 @@ function buildWardrobePanel() {
     { id: 'extras', label: '✨ Extras', build: () => {
         const chipsWrap = el('div', 'chips');
         const btns = accList.map((a) => {
-          const locked = a.locked && progress.level < a.locked;
-          const b = el('button', 'chip', locked ? `${a.label}<small>🔒 unlocks at Lv ${a.locked}</small>` : a.label);
-          if (locked) b.classList.add('locked');
+          const li = lockInfo(a);
+          const b = el('button', 'chip', li ? `${a.label}<small>${li.label}</small>` : a.label);
+          if (li) b.classList.add('locked');
           b.addEventListener('click', () => {
-            if (a.locked && progress.level < a.locked) {
-              toast(`🔒 Reach <b>level ${a.locked}</b> to unlock this!`, 2200);
-              return;
-            }
+            if (lockInfo(a)) { toast(lockInfo(a).toast, 2400); return; }
             player.setAccessory(a.id, !player.cfg.accessories[a.id]);
             persistCfg();
             syncUI();
           });
           chipsWrap.appendChild(b);
-          return { b, id: a.id, locked: !!locked };
+          return { b, o: a, kind: 'acc' };
         });
-        uiSync.push(() => { for (const { b, id, locked } of btns) b.classList.toggle('on', !locked && !!player.cfg.accessories[id]); });
+        /* sparkle trail (boutique item, toggle) */
+        if (state.purchases.trail) {
+          const b = el('button', 'chip', '✨ Sparkle trail');
+          b.addEventListener('click', () => {
+            state.settings.trail = !state.settings.trail;
+            save();
+            syncUI();
+          });
+          chipsWrap.appendChild(b);
+          btns.push({ b, o: { id: '__trail' }, kind: 'trail' });
+        } else {
+          const b = el('button', 'chip locked', '✨ Sparkle trail<small>🛍️ 35 candies</small>');
+          b.addEventListener('click', () => toast('🛍️ Buy the <b>Sparkle Trail</b> in the Candy Boutique!', 2400));
+          chipsWrap.appendChild(b);
+        }
+        uiSync.push(() => {
+          for (const { b, o, kind } of btns) {
+            if (kind === 'trail') b.classList.toggle('on', !!state.settings.trail);
+            else b.classList.toggle('on', !lockInfo(o) && !!player.cfg.accessories[o.id]);
+          }
+        });
         return container(groupLabel('Accessories'), chipsWrap);
       } },
   ];
@@ -669,6 +777,76 @@ function syncUI() {
 buildWardrobePanel();
 
 /* ------------------------------------------------------------------ */
+/* Candy boutique (shop)                                               */
+/* ------------------------------------------------------------------ */
+const SHOP = [
+  { id: 'candycane', icon: '🍭', name: 'Candy Cane Outfit', price: 15, desc: 'A stripey sweet outfit for any doll.' },
+  { id: 'rainbow', icon: '🌈', name: 'Rainbow Gown', price: 20, desc: 'A swirling rainbow skirt (girls · also unlocks at Lv 2).' },
+  { id: 'star', icon: '✨', name: 'Star Suit', price: 20, desc: 'A suit sprinkled with stars (boys · also unlocks at Lv 2).' },
+  { id: 'wand', icon: '🪄', name: 'Star Wand', price: 25, desc: 'A twinkling wand held in the right hand.' },
+  { id: 'wings', icon: '🦋', name: 'Butterfly Wings', price: 35, desc: 'Flapping rainbow wings (also unlocks at Lv 3).' },
+  { id: 'trail', icon: '💫', name: 'Sparkle Trail', price: 35, desc: 'Leave sparkles wherever you run.' },
+  { id: 'halo', icon: '🌟', name: 'Golden Halo', price: 50, desc: 'A glowing halo (also unlocks at Lv 4).' },
+];
+function renderShop() {
+  const balance = candyBalance();
+  $('shopBalance').textContent = `Your candies: 🍬 ${balance}`;
+  const list = $('shopList');
+  if (!list) return;
+  list.innerHTML = '';
+  for (const item of SHOP) {
+    const owned = !!state.purchases[item.id];
+    const row = document.createElement('div');
+    row.className = 'shop-row' + (owned ? ' owned' : '');
+    const btn = document.createElement('button');
+    btn.className = 'sr-buy';
+    if (owned) { btn.textContent = '✓ Owned'; btn.disabled = true; }
+    else {
+      btn.textContent = `Buy · 🍬 ${item.price}`;
+      btn.disabled = balance < item.price;
+      btn.addEventListener('click', () => buyItem(item));
+    }
+    row.innerHTML = `
+      <div class="sr-icon">${item.icon}</div>
+      <div class="sr-body">
+        <div class="sr-name">${item.name}</div>
+        <div class="sr-desc">${item.desc}</div>
+      </div>`;
+    row.appendChild(btn);
+    list.appendChild(row);
+  }
+}
+function buyItem(item) {
+  const balance = candyBalance();
+  if (balance < item.price || state.purchases[item.id]) return;
+  state.spent += item.price;
+  state.purchases[item.id] = true;
+  save();
+  toast(`🛍️ Purchased <b>${item.name}</b>! Equip it in the wardrobe.`, 3200);
+  if (effectsOn()) effects.spawnConfetti(16, player.group.position);
+  updateStats();
+  renderShop();
+  renderCharInfo();
+  buildWardrobePanel();
+}
+function openShop() {
+  renderShop();
+  shopEl.classList.remove('hidden');
+  closeJournal();
+}
+function closeShop() { shopEl.classList.add('hidden'); }
+
+/* ------------------------------------------------------------------ */
+/* Quest journal overlay                                               */
+/* ------------------------------------------------------------------ */
+function openJournal() {
+  renderJournal();
+  journalEl.classList.remove('hidden');
+  closeShop();
+}
+function closeJournal() { journalEl.classList.add('hidden'); }
+
+/* ------------------------------------------------------------------ */
 /* Modes                                                               */
 /* ------------------------------------------------------------------ */
 const game = {
@@ -678,8 +856,10 @@ const game = {
   vy: 0,
   grounded: true,
   walk01: 0,
+  doorHintShown: false,
+  chestHintShown: false,
+  trailTimer: 0,
 };
-const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 function enterWorld() {
   game.mode = 'world';
@@ -692,6 +872,7 @@ function enterWorld() {
   if (isTouch) joyEl.classList.add('show');
   document.body.classList.add('mode-world');
 
+  exitCastleScene();
   studioGroup.visible = false;
   world.group.visible = true;
   scene.background = worldBg;
@@ -703,18 +884,19 @@ function enterWorld() {
   player.group.rotation.y = Math.PI;
   game.vy = 0;
   game.walk01 = 0;
+  game.doorHintShown = false;
 
-  cam.target.set(world.spawn.x, 1.1, world.spawn.z);
+  cam.target.set(player.group.position.x, 1.1, player.group.position.z);
   cam.yaw = 0; cam.pitch = 0.5; cam.dist = 6.5;
-  camera.position.set(world.spawn.x, 4, world.spawn.z + 7);
+  camera.position.set(player.group.position.x, 4, player.group.position.z + 7);
 
   if (music.ctx) music.start('ambient');
   updateHud();
   updateStats();
   updateTracker();
   const done = QUESTS.filter((q) => progress.isQuestDone(q.id)).length;
-  toast(`${currentChar.emoji} <b>${currentChar.name}</b> enters Candy World!<br><small>${done < QUESTS.length ? 'Check the quest tracker — candy to find, quests to complete!' : 'All quests complete — enjoy the world!'}</small>`, 4200);
-  if (effectsOn()) effects.spawnHearts(3, world.spawn);
+  toast(`${currentChar.emoji} <b>${currentChar.name}</b> enters Candy World!<br><small>${done < QUESTS.length ? '📜 Journal shows your quests — follow the golden beacon!' : 'All quests complete — enjoy the world!'}</small>`, 4200);
+  if (effectsOn()) effects.spawnHearts(3, player.group.position);
   save();
 }
 function enterStudio() {
@@ -730,10 +912,12 @@ function enterStudio() {
   game.danceT = 0;
   if (music.ctx) music.start('ambient');
 
+  exitCastleScene();
   world.group.visible = false;
   studioGroup.visible = true;
   scene.background = studioBg;
   scene.fog = studioFog;
+  world.setBeacon(null);
 
   studioGroup.add(player.group);
   player.group.position.set(0, 0.01, 0);
@@ -745,11 +929,208 @@ function enterStudio() {
   save();
 }
 
+/* castle mode */
+function enterCastle() {
+  game.mode = 'castle';
+  world.group.visible = false;
+  world.setBeacon(null);
+  trackerEl.innerHTML = '';
+  world.castle.group.visible = true;
+  scene.background = studioBg;
+  scene.fog = castleFog;
+
+  world.castle.group.add(player.group);
+  player.group.position.set(0, 0, 3.8);
+  player.group.rotation.y = Math.PI;
+  game.vy = 0;
+  game.walk01 = 0;
+  game.chestHintShown = false;
+
+  cam.target.set(0, 1.1, 3.8);
+  cam.yaw = 0; cam.pitch = 0.35; cam.dist = 4.2;
+  camera.position.set(0, 2.6, 7.6);
+  toast('🏰 <b>The Candy Castle</b> — throne room of the realm.<br><small>Find the treasure chest… and try the throne</small>', 3600);
+}
+function exitCastleScene() {
+  world.castle.group.visible = false;
+}
+function leaveCastle() {
+  game.mode = 'world';
+  world.castle.group.visible = false;
+  world.group.visible = true;
+  scene.background = worldBg;
+  scene.fog = worldFog;
+
+  world.group.add(player.group);
+  player.group.position.copy(world.castleDoor);
+  player.group.position.z -= 1.2;
+  player.group.position.y = 0;
+  player.group.rotation.y = 0;
+  game.doorHintShown = false;
+  cam.target.set(player.group.position.x, 1.1, player.group.position.z);
+  updateTracker();
+}
+
 /* ------------------------------------------------------------------ */
-/* Buttons                                                             */
+/* NPC dialogue with choices                                           */
+/* ------------------------------------------------------------------ */
+let dialogueOpen = false;
+let dialogueTimer = null;
+function closeDialogue() {
+  dialogueEl.classList.remove('show', 'interactive');
+  dialogueOpen = false;
+  clearTimeout(dialogueTimer);
+}
+function dialogueHtml(name, emoji, text, choices) {
+  dialogueEl.innerHTML = `<b>${emoji} ${name}</b><br>“${text}”` +
+    (choices ? `<div class="dchoices">${choices}</div>` : '');
+  dialogueEl.classList.add('show', 'interactive');
+  dialogueOpen = true;
+  clearTimeout(dialogueTimer);
+  /* auto-hide casual chatter, but keep choice dialogs open until answered */
+  if (!choices) dialogueTimer = setTimeout(() => closeDialogue(), 7000);
+}
+function dchoiceBtn(label, fn, isQuest) {
+  const b = document.createElement('button');
+  b.className = 'dchoice' + (isQuest ? ' quest' : '');
+  b.innerHTML = label;
+  b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+  return b;
+}
+
+function nearestNpc() {
+  let best = null, bestD = 25;
+  for (const n of npcs) {
+    const d2 = n.doll.group.position.distanceToSquared(player.group.position);
+    if (d2 < bestD) { bestD = d2; best = n; }
+  }
+  return best;
+}
+
+function npcQuestAction(n) {
+  const q = n.ch.quest;
+  const stage = progress.questStage(q.id);
+  if (stage === 'done') {
+    dialogueHtml(n.ch.name, n.ch.emoji, q.done, null);
+    return;
+  }
+  if (stage === 0) {
+    progress.setQuestStage(q.id, 1);
+    save();
+    updateTracker();
+    renderJournal();
+    dialogueHtml(n.ch.name, n.ch.emoji, q.offer, null);
+    toast(`📜 New quest: <b>${QUESTS.find((x) => x.id === q.id).title}</b>`, 3000);
+    return;
+  }
+  /* active */
+  if (q.id === 'princeFavor') {
+    if (candyBalance() >= 8) {
+      state.spent += 8; /* the candies are handed over */
+      completeQuest(q.id);
+      dialogueHtml(n.ch.name, n.ch.emoji, q.done, null);
+      updateStats();
+    } else {
+      const need = 8 - candyBalance();
+      dialogueHtml(n.ch.name, n.ch.emoji, q.active.replace('{N}', need), null);
+    }
+    return;
+  }
+  dialogueHtml(n.ch.name, n.ch.emoji, q.active, null);
+}
+
+function talkToNpc(n) {
+  n.doll.wave();
+  const line = n.ch.lines[(Math.random() * n.ch.lines.length) | 0];
+  const choices = [];
+  if (n.ch.quest) {
+    const stage = progress.questStage(n.ch.quest.id);
+    const label = stage === 0 ? '📜 Quest' : (stage === 'done' ? '📜 Quest' : '📜 How goes it?');
+    choices.push(dchoiceBtn(label, () => npcQuestAction(n), true));
+  }
+  choices.push(dchoiceBtn('💬 Chat', () => {
+    const l = n.ch.lines[(Math.random() * n.ch.lines.length) | 0];
+    dialogueHtml(n.ch.name, n.ch.emoji, l, null);
+  }));
+  choices.push(dchoiceBtn('👋 Bye', closeDialogue));
+  dialogueHtml(n.ch.name, n.ch.emoji, line, null);
+  /* render choice buttons after the line */
+  const wrap = document.createElement('div');
+  wrap.className = 'dchoices';
+  for (const c of choices) wrap.appendChild(c);
+  dialogueEl.appendChild(wrap);
+
+  /* escort quest: first talk sets homeSweet stage */
+  if (!progress.isQuestDone('homeSweet') && progress.questStage('homeSweet') === 0) {
+    progress.setQuestStage('homeSweet', 1);
+    toast(`🏡 <b>${n.ch.name}</b> will meet you at the gumdrop village!`, 3200);
+    updateTracker();
+    save();
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Interaction (E key / Talk button)                                   */
+/* ------------------------------------------------------------------ */
+function interact() {
+  if (dialogueOpen) { closeDialogue(); return; }
+  if (game.mode === 'world') {
+    /* near castle door? */
+    if (player.group.position.distanceTo(world.castleDoor) < 3.4) {
+      enterCastle();
+      return;
+    }
+    const n = nearestNpc();
+    if (n) {
+      talkToNpc(n);
+      return;
+    }
+    toast('Nobody is close enough to talk to 🤔 — walk up to a doll!', 2200);
+  } else if (game.mode === 'castle') {
+    /* near chest? */
+    const c = world.castle.chest.group.position;
+    if (player.group.position.distanceTo(c) < 2.2) {
+      openChest();
+      return;
+    }
+    /* near door -> leave */
+    if (player.group.position.z > 4.0 && Math.abs(player.group.position.x) < 1.4) {
+      leaveCastle();
+      return;
+    }
+    /* throne */
+    if (Math.hypot(player.group.position.x, player.group.position.z + 3.6) < 1.8) {
+      player.boing();
+      if (effectsOn()) effects.spawnHearts(3, player.group.position);
+      toast('👑 You sit on the throne. <i>All of Candy World salutes you!</i>', 3000);
+      return;
+    }
+    toast('Explore the throne room — the chest glows in the corner 🔒', 2200);
+  }
+}
+
+function openChest() {
+  const chest = world.castle.chest;
+  if (!chest.opened) {
+    chest.opened = true;
+    chest.anim = 1;
+    progress.addCandies(8);
+    completeQuest('royalTreasure');
+    if (effectsOn()) {
+      effects.spawnConfetti(40, chest.group.position.clone().add(new THREE.Vector3(0, 1, 0)));
+      effects.spawnHearts(5, player.group.position);
+    }
+    toast('🗝️ The royal vault opens — <b>+8 candies</b>!', 3400);
+  } else {
+    toast('The vault is empty… but the memory of candy remains 🍬', 2400);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Buttons & keys                                                      */
 /* ------------------------------------------------------------------ */
 $('btnEnter').addEventListener('click', enterWorld);
-$('btnHome').addEventListener('click', enterStudio);
+$('btnHome').addEventListener('click', () => { if (game.mode === 'castle') leaveCastle(); enterStudio(); });
 $('btnCustomize').addEventListener('click', () => panelEl.classList.toggle('hidden'));
 $('btnDance').addEventListener('click', () => {
   if (game.danceT > 0) {
@@ -769,6 +1150,16 @@ $('btnWave').addEventListener('click', () => {
 });
 $('btnSpin').addEventListener('click', () => { game.spinT = 1.6; });
 $('btnJump').addEventListener('click', () => input.queueJump());
+$('btnTalk').addEventListener('click', interact);
+$('btnJournal').addEventListener('click', openJournal);
+$('btnJournal2').addEventListener('click', openJournal);
+$('btnCloseJournal').addEventListener('click', closeJournal);
+journalEl.addEventListener('click', (e) => { if (e.target === journalEl) closeJournal(); });
+$('btnShop').addEventListener('click', openShop);
+$('btnShop2').addEventListener('click', openShop);
+$('btnCloseShop').addEventListener('click', closeShop);
+shopEl.addEventListener('click', (e) => { if (e.target === shopEl) closeShop(); });
+
 $('btnMute').addEventListener('click', (e) => {
   const muted = !music.muted;
   music.setMuted(muted);
@@ -778,35 +1169,13 @@ $('btnMute').addEventListener('click', (e) => {
   $('optMusic').checked = !muted;
 });
 
-/* ---------- talk to NPCs ---------- */
-function talk() {
-  if (game.mode !== 'world') return;
-  let best = null, bestD = 25;
-  for (const n of npcs) {
-    const d2 = n.doll.group.position.distanceToSquared(player.group.position);
-    if (d2 < bestD) { bestD = d2; best = n; }
-  }
-  if (!best) { toast('Nobody is close enough to talk to 🤔 — walk up to a doll!', 2400); return; }
-  best.doll.wave();
-  const line = best.ch.lines[(Math.random() * best.ch.lines.length) | 0];
-  showDialogue(best.ch.name, best.ch.emoji, line);
-  if (!progress.isQuestDone('homeSweet') && progress.questStage('homeSweet') === 0) {
-    progress.setQuestStage('homeSweet', 1);
-    toast(`🏡 <b>${best.ch.name}</b> will meet you at the gumdrop village!`, 3200);
-    updateTracker();
-    save();
-  }
-}
-$('btnTalk').addEventListener('click', talk);
-
-/* ---------- settings ---------- */
+/* settings */
 function openSettings() { settingsEl.classList.remove('hidden'); }
 function closeSettings() { settingsEl.classList.add('hidden'); }
 $('btnSettings').addEventListener('click', openSettings);
 $('btnSettings2').addEventListener('click', openSettings);
 $('btnCloseSettings').addEventListener('click', closeSettings);
 settingsEl.addEventListener('click', (e) => { if (e.target === settingsEl) closeSettings(); });
-
 $('optMusic').checked = state.settings.music;
 $('optShadows').checked = state.settings.shadows;
 $('optEffects').checked = state.settings.effects;
@@ -829,28 +1198,29 @@ $('btnReset').addEventListener('click', () => {
   try { localStorage.removeItem(STORE_KEY); } catch { /* ignore */ }
   location.reload();
 });
-
 function setShadows(on) {
   renderer.shadowMap.enabled = on;
   key.castShadow = on;
   scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
 }
 
-/* keyboard shortcuts */
+/* keyboard */
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
-  if (e.code === 'KeyE') talk();
+  if (e.code === 'KeyE') interact();
+  if (e.code === 'KeyJ') (journalEl.classList.contains('hidden') ? openJournal() : closeJournal());
+  if (e.code === 'KeyB') (shopEl.classList.contains('hidden') ? openShop() : closeShop());
   if (e.code === 'KeyQ') { player.wave(); if (effectsOn()) effects.spawnHearts(2, player.group.position); }
   if (e.code === 'KeyR') $('btnDance').click();
   if (e.code === 'KeyF') game.spinT = 1.6;
   if (e.code === 'KeyM') $('btnMute').click();
-  if (e.code === 'Escape') closeSettings();
-  if (e.code === 'KeyH' && game.mode === 'world') enterStudio();
+  if (e.code === 'Escape') { closeSettings(); closeJournal(); closeShop(); closeDialogue(); }
+  if (e.code === 'KeyH' && game.mode !== 'studio') { if (game.mode === 'castle') leaveCastle(); enterStudio(); }
 });
 
-/* browsers block audio until the first user gesture */
+/* audio unlock on first gesture — respects the saved music preference */
 const kickstartMusic = () => {
-  if (game.mode === 'world' && !music.playing && state.settings.music) music.start('ambient');
+  if (game.mode !== 'studio' && !music.playing && state.settings.music) music.start('ambient');
 };
 window.addEventListener('pointerdown', kickstartMusic);
 window.addEventListener('keydown', kickstartMusic);
@@ -871,7 +1241,7 @@ function lerpAngle(a, b, t) {
   return a + d * t;
 }
 
-function resolveCollisions(p, r) {
+function resolveWorldCollisions(p, r) {
   for (const b of world.boxes) {
     if (p.x + r < b.minX || p.x - r > b.maxX || p.z + r < b.minZ || p.z - r > b.maxZ) continue;
     const cx = Math.max(b.minX, Math.min(p.x, b.maxX));
@@ -911,11 +1281,48 @@ function resolveCollisions(p, r) {
     p.z = (p.z / bd) * (world.R_BOUND - 1);
   }
 }
+function resolveCastleCollisions(p, r) {
+  const boxes = world.castle.boxes;
+  for (const b of boxes) {
+    if (p.x + r < b.minX || p.x - r > b.maxX || p.z + r < b.minZ || p.z - r > b.maxZ) continue;
+    const cx = Math.max(b.minX, Math.min(p.x, b.maxX));
+    const cz = Math.max(b.minZ, Math.min(p.z, b.maxZ));
+    const dx = p.x - cx, dz = p.z - cz;
+    const d2 = dx * dx + dz * dz;
+    if (d2 > 1e-6) {
+      const d = Math.sqrt(d2);
+      if (d < r) {
+        const push = (r - d) / d;
+        p.x += dx * push;
+        p.z += dz * push;
+      }
+    } else {
+      const l = p.x - b.minX + r, rr = b.maxX - p.x + r;
+      const t = p.z - b.minZ + r, bo = b.maxZ - p.z + r;
+      const m = Math.min(l, rr, t, bo);
+      if (m === l) p.x = b.minX - r;
+      else if (m === rr) p.x = b.maxX + r;
+      else if (m === t) p.z = b.minZ - r;
+      else p.z = b.maxZ + r;
+    }
+  }
+  for (const c of world.castle.circles) {
+    const dx = p.x - c.x, dz = p.z - c.z;
+    const rr = c.r + r;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < rr * rr && d2 > 1e-6) {
+      const d = Math.sqrt(d2);
+      p.x = c.x + (dx / d) * rr;
+      p.z = c.z + (dz / d) * rr;
+    }
+  }
+}
 
 function updatePlayer(dt, t) {
   const p = player.group.position;
   const ax = input.axis();
   const running = input.running();
+  const inCastle = game.mode === 'castle';
 
   if (ax.len > 0.08 && game.danceT <= 0) {
     const speed = currentChar.speed * (running ? 1.45 : 1) * (0.45 + 0.55 * ax.len);
@@ -951,7 +1358,8 @@ function updatePlayer(dt, t) {
     p.y = 0;
   }
 
-  resolveCollisions(p, PLAYER_R);
+  if (inCastle) resolveCastleCollisions(p, PLAYER_R);
+  else resolveWorldCollisions(p, PLAYER_R);
 
   /* spin emote */
   if (game.spinT > 0) {
@@ -968,14 +1376,37 @@ function updatePlayer(dt, t) {
     }
   }
 
-  /* candy pickup */
+  /* sparkle trail (boutique item) */
+  if (state.purchases.trail && state.settings.trail && effectsOn() && game.walk01 > 0.55) {
+    game.trailTimer -= dt;
+    if (game.trailTimer <= 0) {
+      game.trailTimer = 0.12;
+      effects.spawnSpark(p);
+    }
+  }
+
+  if (inCastle) {
+    /* hints inside the castle */
+    const chest = world.castle.chest;
+    if (!chest.opened && !game.chestHintShown && p.distanceTo(chest.group.position) < 2.6) {
+      game.chestHintShown = true;
+      toast('🗝️ Press <b>E</b> to open the royal vault!', 2600);
+    }
+    if (p.z > 4.0 && Math.abs(p.x) < 1.4 && !game.doorHintShown) {
+      game.doorHintShown = true;
+      toast('🚪 Press <b>E</b> to leave the castle', 2400);
+    }
+    return;
+  }
+
+  /* candy pickup (permanent) */
   for (const c of world.candies) {
     if (!c.active) continue;
     const dx = p.x - c.x, dz = p.z - c.z;
     if (dx * dx + dz * dz < 0.85) {
       c.active = false;
       c.obj.visible = false;
-      c.respawn = 75;
+      state.progress.collected[c.id] = true;
       progress.addCandy();
       if (effectsOn()) effects.spawnHearts(1, p);
       updateStats();
@@ -990,30 +1421,48 @@ function updatePlayer(dt, t) {
       world.goldenBear.active = false;
       world.goldenBear.obj.visible = false;
       world.goldenBear.light.visible = false;
+      progress.addCandies(5);
       if (effectsOn()) effects.spawnConfetti(20, world.goldenBear.obj.position);
-      toast('🧸 You found the <b>golden gummy bear</b>!', 3000);
+      toast('🧸 You found the <b>golden gummy bear</b>! +5 candies', 3000);
+      updateStats();
     }
   }
 
-  /* gem pickup (Star Candy) */
+  /* star candy gem — repeatable candy source */
   if (world.gemActive) {
     const gp = world.gem.position;
     const dx = p.x - gp.x, dz = p.z - gp.z;
     if (dx * dx + dz * dz < 1.3 * 1.3 && Math.abs(p.y + 1.2 - gp.y) < 2) {
       world.collectGem();
-      if (effectsOn()) {
-        effects.spawnConfetti(40, gp);
-        effects.spawnHearts(6, p);
+      progress.addCandies(1);
+      if (!progress.questStage('__gemFirst')) {
+        progress.setQuestStage('__gemFirst', 'done');
+        progress.addXP(10);
+        toast('⭐ You found the <b>Star Candy</b>! (+10 XP) It reappears with a candy each time…', 3600);
+      } else {
+        toast('⭐ Star Candy! <b>+1 candy</b>', 2000);
       }
-      toast('⭐ You found the <b>Star Candy</b>! It will reappear soon…', 3600);
+      if (effectsOn()) {
+        effects.spawnConfetti(24, gp);
+        effects.spawnHearts(3, p);
+      }
+      updateStats();
+      save();
     }
   }
 
+  /* castle door hint */
+  if (!game.doorHintShown && p.distanceTo(world.castleDoor) < 5) {
+    game.doorHintShown = true;
+    toast('🏰 Press <b>E</b> at the gate to enter the candy castle!', 3000);
+  }
+
   updateQuests();
+  updateTracker();
 }
 
 /* ------------------------------------------------------------------ */
-/* NPC update — allocation-free, LOD + stuck detection                 */
+/* NPC update                                                          */
 /* ------------------------------------------------------------------ */
 const _nToPlayer = new THREE.Vector3();
 const _nDir = new THREE.Vector3();
@@ -1025,11 +1474,9 @@ function updateNpc(n, dt, t) {
   const distToPlayer = _nToPlayer.length();
   npcTick++;
 
-  /* LOD: distant NPCs update every 3rd frame (skips animation work) */
   if (distToPlayer > 45 && (npcTick + n.tick) % 3 !== 0) return;
 
   if (distToPlayer < 3 && game.mode === 'world') {
-    /* greet the player */
     n.state = 'greet';
     n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nToPlayer.x, _nToPlayer.z), Math.min(1, dt * 6));
     n.waveTimer -= dt;
@@ -1059,7 +1506,6 @@ function updateNpc(n, dt, t) {
     }
   }
 
-  /* stuck detection: if blocked by scenery for ~1.6s, pick a new target */
   n.stuckTimer += dt;
   if (n.stuckTimer > 1.6) {
     if (p.distanceToSquared(n.lastPos) < 0.09) {
@@ -1070,8 +1516,7 @@ function updateNpc(n, dt, t) {
     n.stuckTimer = 0;
   }
 
-  /* keep NPCs off props */
-  resolveCollisions(p, 0.3);
+  resolveWorldCollisions(p, 0.3);
   const bd = Math.hypot(p.x, p.z);
   if (bd > world.R_BOUND - 1.5) {
     n.target.set(0, 0, 26);
@@ -1110,6 +1555,13 @@ function animate() {
     cam.target.set(0, 0.85, 0);
     updateCamera(dt, true);
     _lightTarget.set(0, 0.6, 0);
+  } else if (game.mode === 'castle') {
+    updatePlayer(dt, t);
+    player.update({ walk01: game.walk01, dance01: game.danceT > 0 ? 1 : 0, beatPhase: beat }, dt, t);
+    world.update(dt, t);
+    cam.target.set(player.group.position.x, player.group.position.y + 1.1, player.group.position.z);
+    updateCamera(dt, false);
+    _lightTarget.copy(player.group.position);
   } else {
     updatePlayer(dt, t);
     player.update({ walk01: game.walk01, dance01: game.danceT > 0 ? 1 : 0, beatPhase: beat }, dt, t);
@@ -1120,7 +1572,6 @@ function animate() {
     _lightTarget.copy(player.group.position);
   }
 
-  /* key light follows the action for tight shadows */
   key.position.set(_lightTarget.x + 6, _lightTarget.y + 11, _lightTarget.z + 5);
   key.target.position.copy(_lightTarget);
   key.target.updateMatrixWorld();
@@ -1130,51 +1581,57 @@ function animate() {
 }
 animate();
 
-/* resize */
+/* resize — also refresh pixel ratio (display change) */
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDPR));
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) music.stop();
-  else if (music.ctx) music.start();
+  else if (music.ctx && state.settings.music) music.start();
 });
 
-/* sync mute icon with loaded preference */
 $('btnMute').textContent = state.settings.music ? '🔊' : '🔇';
 
-/* restore NPCs + last mode */
+/* boot */
 rebuildNpcs();
 if (state.mode === 'world') enterWorld(); else enterStudio();
 updateStats();
+renderShop();
 
-/* debug hook — development / ?debug only, never in production */
+/* debug hook — dev / ?debug only */
 const DEBUG = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV) ||
   new URLSearchParams(location.search).has('debug');
 if (DEBUG) {
   window.__trepio = {
     game, world, player, npcs, music, progress, quests: QUESTS,
     teleport(x, z) { player.group.position.set(x, 0, z); },
-    talk,
+    interact, enterCastle, leaveCastle, openChest, state: state,
+    buy(id) { const it = SHOP.find((x) => x.id === id); if (it) buyItem(it); },
     state() {
       return {
         mode: game.mode,
         pos: player.group.position.toArray(),
-        npcs: npcs.map((n) => n.doll.group.position.toArray()),
-        npcNames: npcs.map((n) => n.ch.name),
+        npcs: npcs.length,
         butterflies: world.butterflies.length,
         candiesActive: world.candies.filter((c) => c.active).length,
         candiesTotal: world.candies.length,
         goldenBear: world.goldenBear.active,
         gemActive: world.gemActive,
+        chestOpened: world.castle.chest.opened,
         gender: player.male ? 'male' : 'female',
         level: progress.level,
         xp: progress.xp,
         candyCount: progress.candies,
+        balance: candyBalance(),
+        purchases: state.purchases,
+        collected: Object.keys(state.progress.collected).length,
         quests: progress.quests,
         tracker: document.getElementById('tracker')?.textContent || '',
+        beacon: world.group.visible ? [world.group.children.find(() => false)] : null,
       };
     },
   };

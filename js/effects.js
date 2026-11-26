@@ -1,7 +1,24 @@
 /* =====================================================================
-   effects.js — hearts, confetti particles
+   effects.js — hearts, confetti, sparkles particles
    ===================================================================== */
 import * as THREE from 'three';
+
+function dotTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 30);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.7)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(32, 32, 30, 0, Math.PI * 2);
+  ctx.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 function heartTexture() {
   const c = document.createElement('canvas');
@@ -26,11 +43,29 @@ function heartTexture() {
 export function createEffects(scene) {
   const heartTex = heartTexture();
   const heartMat = new THREE.SpriteMaterial({ map: heartTex, transparent: true, depthWrite: false });
+  const sparkMat = new THREE.SpriteMaterial({ map: dotTexture(), color: '#ffe9a8', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   const confettiGeo = new THREE.PlaneGeometry(0.09, 0.14);
   const confettiMats = ['#ff8fb7', '#ffd45e', '#63b8f5', '#a7d97a', '#b57de0', '#fff3f6']
     .map((c) => new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
 
   const particles = [];
+
+  function spawnSpark(at) {
+    const s = new THREE.Sprite(sparkMat);
+    s.renderOrder = 10;
+    s.position.copy(at);
+    s.position.x += (Math.random() - 0.5) * 0.35;
+    s.position.z += (Math.random() - 0.5) * 0.35;
+    s.position.y = 0.25 + Math.random() * 0.5;
+    const sc = 0.07 + Math.random() * 0.08;
+    s.scale.set(sc, sc, 1);
+    scene.add(s);
+    particles.push({
+      obj: s, kind: 'spark', life: 0, max: 0.5 + Math.random() * 0.35, baseScale: sc,
+      phase: Math.random() * 6,
+      vel: new THREE.Vector3((Math.random() - 0.5) * 0.15, 0.5 + Math.random() * 0.3, (Math.random() - 0.5) * 0.15),
+    });
+  }
 
   function spawnHearts(n, at = null) {
     for (let i = 0; i < n; i++) {
@@ -78,6 +113,8 @@ export function createEffects(scene) {
       p.obj.position.addScaledVector(p.vel, dt);
       if (p.kind === 'heart') {
         p.obj.position.y += Math.sin(t * 6 + p.phase) * 0.12 * dt;
+      } else if (p.kind === 'spark') {
+        p.obj.scale.setScalar(p.baseScale * (0.7 + 0.3 * Math.sin(t * 20 + p.phase)));
       } else {
         p.vel.x += Math.sin(t * 3 + p.phase) * 0.35 * dt;
         p.obj.rotation.x += p.spin.x * dt;
@@ -87,7 +124,7 @@ export function createEffects(scene) {
       const k = p.life / p.max;
       if (k > 0.7) {
         const s = Math.max(0.001, 1 - (k - 0.7) / 0.3);
-        p.obj.scale.setScalar(p.kind === 'heart' ? p.baseScale * s : s);
+        p.obj.scale.setScalar(p.kind === 'heart' ? p.baseScale * s : (p.kind === 'spark' ? p.baseScale * s : s));
       }
       if (p.life >= p.max) {
         scene.remove(p.obj);
@@ -96,5 +133,5 @@ export function createEffects(scene) {
     }
   }
 
-  return { spawnHearts, spawnConfetti, update };
+  return { spawnHearts, spawnConfetti, spawnSpark, update };
 }
