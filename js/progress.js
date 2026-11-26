@@ -26,9 +26,10 @@ export function createProgress(saved = {}) {
     p.level = levelFromXP(p.xp);
     if (p.level > before) for (const f of listeners.levelup) f(p.level);
   };
-  p.addCandy = () => {
-    p.candies++;
-    p.addXP(1);
+  p.addCandy = () => p.addCandies(1);
+  p.addCandies = (n) => {
+    p.candies += n;
+    p.addXP(Math.ceil(n / 2));
     for (const f of listeners.candy) f(p.candies);
   };
   p.questStage = (id) => (p.quests[id] === undefined ? 0 : p.quests[id]);

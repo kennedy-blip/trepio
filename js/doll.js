@@ -28,6 +28,7 @@ export const OUTFITS = [
   { id: 'party',    label: '🎉 Party',     flare: 0.27, len: 0.34, puff: 0.066, belt: true,  trim: true  },
   { id: 'coord',    label: '🧶 Co-ord',    flare: 0.33, len: 0.46, puff: 0,     belt: false, trim: false },
   { id: 'rainbow',  label: '🌈 Rainbow Gown', flare: 0.50, len: 0.60, puff: 0.07, belt: false, trim: true, locked: 2 },
+  { id: 'candycane', label: '🍭 Candy Cane', flare: 0.42, len: 0.50, puff: 0.07, belt: false, trim: true, shop: 15 },
 ];
 
 export const MALE_HAIRSTYLES = [
@@ -42,6 +43,7 @@ export const MALE_OUTFITS = [
   { id: 'sporty',   label: '⚽ Sporty',   len: 0.15, belt: false, jacket: false },
   { id: 'smart',    label: '🎩 Smart',    len: 0.36, belt: true,  jacket: true  },
   { id: 'star',     label: '✨ Star Suit', len: 0.30, belt: true, jacket: true, locked: 2 },
+  { id: 'candycane', label: '🍭 Candy Cane', len: 0.28, belt: true, jacket: false, shop: 15 },
 ];
 
 export const SHOESTYLES = [
@@ -57,6 +59,7 @@ export const ACCESSORIES = [
   { id: 'earrings', label: '💎 Earrings' },
   { id: 'wings',    label: '🦋 Wings', locked: 3 },
   { id: 'halo',     label: '🌟 Halo',  locked: 4 },
+  { id: 'wand',     label: '🪄 Star Wand', shop: 25 },
 ];
 export const MALE_ACCESSORIES = [
   { id: 'crown',   label: '👑 Crown'    },
@@ -64,10 +67,11 @@ export const MALE_ACCESSORIES = [
   { id: 'glasses', label: '👓 Glasses'  },
   { id: 'wings',   label: '🦋 Wings', locked: 3 },
   { id: 'halo',    label: '🌟 Halo',  locked: 4 },
+  { id: 'wand',    label: '🪄 Star Wand', shop: 25 },
 ];
 
 /* unlockable outfit textures (built lazily) */
-let _rainbowTex = null, _starTex = null;
+let _rainbowTex = null, _starTex = null, _candycaneTex = null;
 export function rainbowTexture() {
   if (_rainbowTex) return _rainbowTex;
   const c = document.createElement('canvas');
@@ -105,6 +109,28 @@ export function starTexture() {
   _starTex = new THREE.CanvasTexture(c);
   _starTex.colorSpace = THREE.SRGBColorSpace;
   return _starTex;
+}
+export function candyCaneTexture() {
+  if (_candycaneTex) return _candycaneTex;
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff4f6';
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.save();
+  ctx.translate(64, 64);
+  ctx.rotate(-Math.PI / 4);
+  ctx.fillStyle = '#f45d8e';
+  const band = 24;
+  for (let x = -128; x < 128; x += band * 2) {
+    ctx.fillRect(x, -128, band, 256);
+  }
+  ctx.restore();
+  _candycaneTex = new THREE.CanvasTexture(c);
+  _candycaneTex.colorSpace = THREE.SRGBColorSpace;
+  _candycaneTex.wrapS = _candycaneTex.wrapT = THREE.RepeatWrapping;
+  _candycaneTex.repeat.set(2, 2);
+  return _candycaneTex;
 }
 
 /* shared, non-varying materials */
@@ -353,15 +379,16 @@ export function createDoll(cfg) {
 
   /* ---------- bottoms: skirt (female) / trousers (male) ---------- */
   let waist = null;
-  let wingL = null, wingR = null, halo = null;
+  let wingL = null, wingR = null, halo = null, wandStar = null;
   function buildBottom() {
     if (male) {
       for (const { trouser } of [legL, legR2]) clearGroup(trouser);
       if (waist) { body.remove(waist); waist.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); waist = null; }
       const o = MALE_OUTFITS.find((x) => x.id === cfg.outfit) || MALE_OUTFITS[0];
       const starry = cfg.outfit === 'star';
-      skirtMat.map = starry ? starTexture() : null;
-      skirtMat.color.set(starry ? '#ffffff' : cfg.skirt);
+      const caney = cfg.outfit === 'candycane';
+      skirtMat.map = starry ? starTexture() : (caney ? candyCaneTexture() : null);
+      skirtMat.color.set(starry || caney ? '#ffffff' : cfg.skirt);
       skirtMat.needsUpdate = true;
       for (const { trouser } of [legL, legR2]) {
         const leg = mesh(new THREE.CapsuleGeometry(legR + 0.012, o.len, 4, 12), skirtMat, 0, -(o.len / 2 + 0.04), 0);
@@ -381,8 +408,9 @@ export function createDoll(cfg) {
     clearGroup(skirtGroup);
     const o = OUTFITS.find((x) => x.id === cfg.outfit) || OUTFITS[0];
     const rainbow = cfg.outfit === 'rainbow';
-    skirtMat.map = rainbow ? rainbowTexture() : null;
-    skirtMat.color.set(rainbow ? '#ffffff' : cfg.skirt);
+    const caney = cfg.outfit === 'candycane';
+    skirtMat.map = rainbow ? rainbowTexture() : (caney ? candyCaneTexture() : null);
+    skirtMat.color.set(rainbow || caney ? '#ffffff' : cfg.skirt);
     skirtMat.needsUpdate = true;
     const pts = [];
     const N = 12;
@@ -548,6 +576,24 @@ export function createDoll(cfg) {
     apiMats.wingMat = wm;
   }
 
+  /* star wand (boutique item) — held in the right hand */
+  {
+    const g = new THREE.Group();
+    g.position.set(0.01, -0.30, 0.06);
+    const stick = mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.34, 8), goldMat, 0, 0.1, 0);
+    g.add(stick);
+    const starMatW = new THREE.MeshStandardMaterial({ color: '#ffe9a8', emissive: '#ffd45e', emissiveIntensity: 0.8, roughness: 0.3 });
+    const star = mesh(new THREE.OctahedronGeometry(0.05), starMatW, 0, 0.29, 0);
+    star.scale.y = 1.4;
+    g.add(star);
+    const sparkle = mesh(new THREE.SphereGeometry(0.012, 8, 6), gemMat, 0.045, 0.26, 0.02);
+    g.add(sparkle);
+    armR.shoulder.add(g);
+    acc.wand = g;
+    apiMats.wandStarMat = starMatW;
+    wandStar = star;
+  }
+
   /* halo (unlockable) */
   {
     const g = new THREE.Group();
@@ -650,6 +696,10 @@ export function createDoll(cfg) {
         halo.position.y = 0.46 + Math.sin(t * 2) * 0.02;
         halo.rotation.y += dt * 0.8;
       }
+      if (acc.wand && acc.wand.visible && api._wandStar) {
+        api._wandStar.rotation.y += dt * 2.4;
+        api._wandStar.position.y = 0.29 + Math.sin(t * 3.2) * 0.02;
+      }
 
       /* hair secondary motion */
       if (tailPivot) {
@@ -674,5 +724,6 @@ export function createDoll(cfg) {
       eyeL.scale.y = eyeR.scale.y = blinkS;
     },
   };
+  api._wandStar = wandStar;
   return api;
 }

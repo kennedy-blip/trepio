@@ -825,7 +825,7 @@ export function createWorld(scene, keyLight) {
     }
   }
 
-  /* ---------------- collectible candies ---------------- */
+  /* ---------------- collectible candies (unique, permanent) ---------------- */
   const candies = [];
   {
     const bodyGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.16, 10);
@@ -843,8 +843,8 @@ export function createWorld(scene, keyLight) {
       [8, 30.5], [-9, 27], [24, -6], [-24, -4], [36, -8], [-36, -6],
       [12, 38], [-12, 39], [0, -24], [4, -26]
     );
-    for (const [x, z] of spots) {
-      const m = mats[(Math.random() * colors.length) | 0];
+    spots.forEach(([x, z], i) => {
+      const m = mats[i % colors.length];
       const g = new THREE.Group();
       const body = new THREE.Mesh(bodyGeo, m);
       body.rotation.z = Math.PI / 2;
@@ -858,8 +858,8 @@ export function createWorld(scene, keyLight) {
       g.position.set(x, 0.45, z);
       g.userData = { baseY: 0.45, phase: Math.random() * 6 };
       group.add(g);
-      candies.push({ obj: g, x, z, active: true, respawn: 0 });
-    }
+      candies.push({ id: 'c' + i, obj: g, x, z, active: true });
+    });
   }
 
   /* ---------------- golden gummy bear (quest) ---------------- */
@@ -896,14 +896,182 @@ export function createWorld(scene, keyLight) {
     goldenBear.light = gl;
   }
 
+  /* ---------------- quest beacon (map marker) ---------------- */
+  let beaconCone = null;
+  const beacon = new THREE.Group();
+  {
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.34, 0.55, 9, 18, 1, true),
+      new THREE.MeshBasicMaterial({ color: '#ffe08a', transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
+    );
+    beam.position.y = 4.5;
+    beacon.add(beam);
+    const beamCore = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.13, 9, 12, 1, true),
+      new THREE.MeshBasicMaterial({ color: '#fff6d8', transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending })
+    );
+    beamCore.position.y = 4.5;
+    beacon.add(beamCore);
+    beaconCone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.42, 0.8, 4),
+      new THREE.MeshBasicMaterial({ color: '#ffd45e', transparent: true, opacity: 0.9 })
+    );
+    beaconCone.rotation.x = Math.PI;
+    beaconCone.position.y = 5.6;
+    beacon.add(beaconCone);
+    beacon.visible = false;
+    group.add(beacon);
+  }
+  function setBeacon(x, z) {
+    if (x === null) { beacon.visible = false; return; }
+    beacon.visible = true;
+    beacon.position.set(x, 0, z);
+  }
+
+  /* ---------------- castle interior (enterable) ---------------- */
+  const castle = { group: new THREE.Group(), boxes: [], circles: [], chandeliers: [] };
+  {
+    const g = castle.group;
+    g.visible = false;
+    scene.add(g);
+    const W = 14, D = 10, H = 5.2;
+    /* checker floor */
+    const floorTex = canvasTex(256, 256, (ctx, w, h) => {
+      const s = 32;
+      for (let y = 0; y < h; y += s) {
+        for (let x = 0; x < w; x += s) {
+          ctx.fillStyle = ((x / s + y / s) % 2 === 0) ? '#fdf0f5' : '#f6c7d9';
+          ctx.fillRect(x, y, s, s);
+        }
+      }
+    }, 4, 3);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D),
+      new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.4 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    g.add(floor);
+    /* walls */
+    const wallMatI = new THREE.MeshStandardMaterial({ map: stripes, roughness: 0.6, side: THREE.DoubleSide });
+    const mkWall = (w, h, x, y, z, rotY) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMatI);
+      m.position.set(x, y, z);
+      m.rotation.y = rotY;
+      m.receiveShadow = true;
+      g.add(m);
+    };
+    mkWall(W, H, 0, H / 2, -D / 2, 0);                    /* north */
+    mkWall(D, H, -W / 2, H / 2, 0, Math.PI / 2);          /* west  */
+    mkWall(D, H, W / 2, H / 2, 0, -Math.PI / 2);          /* east  */
+    mkWall(W / 2 - 1, H, -(W / 4 + 0.5), H / 2, D / 2, Math.PI);  /* south left  */
+    mkWall(W / 2 - 1, H, (W / 4 + 0.5), H / 2, D / 2, Math.PI);  /* south right */
+    /* colliders */
+    castle.boxes.push({ minX: -W / 2 - 0.3, maxX: -W / 2 + 0.3, minZ: -D / 2, maxZ: D / 2 });
+    castle.boxes.push({ minX: W / 2 - 0.3, maxX: W / 2 + 0.3, minZ: -D / 2, maxZ: D / 2 });
+    castle.boxes.push({ minX: -W / 2, maxX: W / 2, minZ: -D / 2 - 0.3, maxZ: -D / 2 + 0.3 });
+    castle.boxes.push({ minX: -W / 2, maxX: -1, minZ: D / 2 - 0.3, maxZ: D / 2 + 0.3 });
+    castle.boxes.push({ minX: 1, maxX: W / 2, minZ: D / 2 - 0.3, maxZ: D / 2 + 0.3 });
+    /* pillars */
+    const pillarMat = mat('#fdf0f5', { roughness: 0.5 });
+    for (const [px, pz] of [[-4.5, -3], [4.5, -3], [-4.5, 2], [4.5, 2]]) {
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, H, 16), pillarMat);
+      p.position.set(px, H / 2, pz);
+      p.castShadow = true;
+      g.add(p);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), mat('#f45d8e'));
+      cap.position.set(px, H, pz);
+      g.add(cap);
+      castle.circles.push({ x: px, z: pz, r: 0.62 });
+    }
+    /* carpet to the throne */
+    const carpet = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 7.4), mat('#e0457a', { roughness: 0.9 }));
+    carpet.rotation.x = -Math.PI / 2;
+    carpet.position.set(0, 0.015, -0.6);
+    carpet.receiveShadow = true;
+    g.add(carpet);
+    /* throne */
+    {
+      const throneGem = mat('#ff9ec6', { roughness: 0.15, metalness: 0.35 });
+      const t = new THREE.Group();
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 1.1), mat('#c98a2f', { metalness: 0.4, roughness: 0.4 }));
+      seat.position.y = 0.6;
+      t.add(seat);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.0, 0.28), mat('#c98a2f', { metalness: 0.4, roughness: 0.4 }));
+      back.position.set(0, 1.6, -0.45);
+      t.add(back);
+      const crest = new THREE.Mesh(new THREE.OctahedronGeometry(0.32), mat('#ffd45e', { metalness: 0.6, roughness: 0.25, emissive: '#ffb84e', emissiveIntensity: 0.3 }));
+      crest.position.set(0, 2.8, -0.45);
+      t.add(crest);
+      for (const s of [-1, 1]) {
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 1.0), mat('#c98a2f', { metalness: 0.4, roughness: 0.4 }));
+        arm.position.set(s * 0.66, 0.95, 0.05);
+        t.add(arm);
+        const gemT = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), throneGem);
+        gemT.position.set(s * 0.66, 1.16, 0.05);
+        t.add(gemT);
+      }
+      t.position.set(0, 0, -3.6);
+      g.add(t);
+      castle.circles.push({ x: 0, z: -3.6, r: 1.05 });
+    }
+    /* treasure chest */
+    {
+      const c = new THREE.Group();
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.62, 0.8), mat('#8a5a3a', { roughness: 0.6 }));
+      base.position.y = 0.31;
+      base.castShadow = true;
+      c.add(base);
+      const lid = new THREE.Group();
+      const lidMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.2, 14, 1, false, 0, Math.PI), mat('#a5713f', { roughness: 0.5 }));
+      lidMesh.rotation.z = Math.PI / 2;
+      lidMesh.position.y = 0.2;
+      lid.add(lidMesh);
+      lid.position.set(0, 0.62, -0.4);
+      c.add(lid);
+      const lock = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.1), mat('#ffd45e', { metalness: 0.7, roughness: 0.3 }));
+      lock.position.set(0, 0.55, 0.42);
+      c.add(lock);
+      c.position.set(3.6, 0, -3.4);
+      c.rotation.y = -0.5;
+      g.add(c);
+      castle.chest = { group: c, lid, opened: false, anim: 0 };
+      castle.circles.push({ x: 3.6, z: -3.4, r: 0.95 });
+    }
+    /* chandeliers */
+    for (const [cx, cz] of [[-3, -1], [3, -1], [0, 2]]) {
+      const ch = new THREE.Group();
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.0, 6), mat('#c98a2f'));
+      chain.position.y = H - 0.5;
+      ch.add(chain);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 8, 20), mat('#ffd45e', { metalness: 0.7, roughness: 0.3, emissive: '#ffd45e', emissiveIntensity: 0.35 }));
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = H - 1.05;
+      ch.add(ring);
+      const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.22, 8), mat('#fff6ec'));
+      candle.position.y = H - 0.93;
+      ch.add(candle);
+      ch.position.set(cx, 0, cz);
+      ch.userData = { phase: Math.random() * 6 };
+      g.add(ch);
+      castle.chandeliers.push(ch);
+    }
+    /* interior light */
+    const inLight = new THREE.PointLight('#ffe3c4', 18, 18);
+    inLight.position.set(0, 3.6, 0);
+    g.add(inLight);
+  }
+
   /* ---------------- api ---------------- */
   return {
     group, boxes, circles, R_BOUND,
     gem, butterflies,
     candies, goldenBear,
+    castle, setBeacon,
     castlePos: new THREE.Vector3(0, 0, -43),
+    castleDoor: new THREE.Vector3(0, 0, -42.6),
     donuts: [new THREE.Vector3(-18, 0, 32), new THREE.Vector3(0, 0, 32), new THREE.Vector3(18, 0, 32)],
     villagePos: new THREE.Vector3(15.5, 0, 21),
+    bigLollipop: new THREE.Vector3(-30, 0, -14),
+    peaks: new THREE.Vector3(0, 0, 48),
     spawn: new THREE.Vector3(0, 0, HALF * CELL + 7.5),
     get gemActive() { return gemActive; },
     collectGem() {
@@ -930,18 +1098,31 @@ export function createWorld(scene, keyLight) {
       }
       riverTex.offset.x += dt * 0.045;
       updateButterflies(dt, t);
-      /* collectible candies: float, spin, respawn */
+      /* collectible candies: float & spin (collection is permanent) */
       for (const c of candies) {
         if (c.active) {
           c.obj.position.y = c.obj.userData.baseY + Math.sin(t * 2.2 + c.obj.userData.phase) * 0.09;
           c.obj.rotation.y += dt * 1.8;
-        } else if (c.respawn > 0) {
-          c.respawn -= dt;
-          if (c.respawn <= 0) { c.active = true; c.obj.visible = true; }
         }
       }
       if (goldenBear.active) {
         goldenBear.obj.rotation.y = -0.6 + Math.sin(t * 0.8) * 0.25;
+      }
+      /* beacon (quest map marker) */
+      if (beacon.visible) {
+        beaconCone.rotation.y += dt * 2.2;
+        beaconCone.position.y = 5.6 + Math.sin(t * 2.2) * 0.3;
+      }
+      /* castle interior */
+      if (castle.group.visible) {
+        for (const ch of castle.chandeliers) {
+          ch.rotation.z = Math.sin(t * 0.9 + ch.userData.phase) * 0.06;
+        }
+        if (castle.chest.anim > 0) {
+          castle.chest.anim = Math.max(0, castle.chest.anim - dt * 1.8);
+          const k = 1 - castle.chest.anim;
+          castle.chest.lid.rotation.x = -k * 1.9;
+        }
       }
       sparkA.rotation.y += dt * 0.02;
       sparkB.rotation.y -= dt * 0.016;
