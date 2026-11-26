@@ -627,3 +627,14 @@ button.danger:hover { background: #f9d5d5; }
 /* arcade records row in the journal */
 .quest-row.games-row { border-color: #ffe3a8; background: rgba(255, 236, 200, 0.55); }
 .quest-row.games-row .qr-head span { font-weight: 800; }
+
+/* settings: quality + save management */
+.quality-btn { width: 100%; text-align: left; padding: 8px 12px; }
+.settings-row.save-mgmt {
+  border-top: 1px dashed #eec7d9;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.save-title { font: 700 12.5px/1.4 inherit; font-family: inherit; color: var(--ink-soft); margin-bottom: 6px; }
+.save-title small { color: #c78aa8; font-weight: 600; }
+.settings-row .settings-actions { display: flex; gap: 6px; }

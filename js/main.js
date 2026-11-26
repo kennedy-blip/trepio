@@ -1,7 +1,9 @@
 /* =====================================================================
-   main.js — Trepio Candy World 2.0 "The Living Candy World"
-   Studio + open world + maze + quests (journal & beacons) + NPC
-   dialogue with choices + candy economy + enterable castle.
+   main.js — Trepio: The Living Fantasy Kingdom
+   Modes, characters, camera, UI wiring and the main loop.
+   Gameplay systems live in sibling modules:
+     quests.js  npc.js  homes.js  minigames.js  inventory.js  pets.js
+     save.js  collide.js  world.js  doll.js  effects.js  input.js  audio.js
    ===================================================================== */
 import * as THREE from 'three';
 import { createDoll, SKINS, HAIRC, CLOTH, EYES, SHOEC,
@@ -13,6 +15,15 @@ import { Beatbox } from './audio.js';
 import { createInput } from './input.js';
 import { createProgress, LEVEL_XP } from './progress.js';
 import { createPet, PETS } from './pets.js';
+import { ctx, $ } from './ctx.js';
+import * as saveMod from './save.js';
+import { RACE_PAR, QUESTS, royalsMet, updateTracker, renderJournal, completeQuest, updateQuests, nameOf } from './quests.js';
+import { SHOP, candyBalance, renderShop, buyItem } from './inventory.js';
+import { startMini, cancelMini, updateMini } from './minigames.js';
+import { npcs, royals, rebuildNpcs, buildRoyals, updateNpc, updateRoyal, nearestNpc, nearestRoyal,
+         talkToNpc, closeDialogue, dialogueOpen, enterNpcHome, exitNpcHome } from './npc.js';
+import { enterHome, leaveHome, nearestHomeDoor, hideAllInteriors, playerSit, getActiveHome } from './homes.js';
+import { lerpAngle, resolveWorldCollisions, resolveCastleCollisions, resolveBoxCircle } from './collide.js';
 
 /* ------------------------------------------------------------------ */
 /* Characters                                                          */
@@ -170,68 +181,22 @@ const CHARACTERS = [
 /* ------------------------------------------------------------------ */
 /* State / save                                                        */
 /* ------------------------------------------------------------------ */
-const STORE_KEY = 'trepio-doll-v2';
 const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) {
-      const s = JSON.parse(raw);
-      s.settings = { music: true, shadows: true, effects: !reducedMotion, trail: true, ...(s.settings || {}) };
-      s.purchases = s.purchases || {};
-      s.spent = s.spent || 0;
-      s.progress = s.progress || { xp: 0, candies: 0, quests: {} };
-      s.progress.collected = s.progress.collected || {};
-      s.progress.met = s.progress.met || {};
-      s.progress.games = { catchBest: 0, raceBest: null, catchFirst: false, raceFirst: false, ...(s.progress.games || {}) };
-      s.settings.pet = s.settings.pet || null;
-      return s;
-    }
-  } catch { /* ignore */ }
-  return {
-    character: 'trixie',
-    cfgs: {},
-    mode: 'studio',
-    progress: { xp: 0, candies: 0, quests: {}, collected: {}, met: {}, games: { catchBest: 0, raceBest: null, catchFirst: false, raceFirst: false } },
-    purchases: {},
-    spent: 0,
-    settings: { music: true, shadows: true, effects: !reducedMotion, trail: true, pet: null },
-  };
-}
-const state = loadState();
-function save() {
-  try {
-    const ser = progress.serialize();
-    ser.collected = state.progress.collected;
-    ser.met = state.progress.met;
-    ser.games = state.progress.games;
-    localStorage.setItem(STORE_KEY, JSON.stringify({
-      ...state,
-      progress: ser,
-    }));
-  } catch { /* ignore */ }
-}
+const state = saveMod.load(reducedMotion);
+const save = saveMod.save;
+
+const progress = createProgress(state.progress);
+
 function cfgFor(id) {
   const ch = CHARACTERS.find((c) => c.id === id);
   return { ...ch.cfg, ...(state.cfgs[id] || {}),
            gender: ch.gender,
            accessories: { ...ch.cfg.accessories, ...((state.cfgs[id] || {}).accessories || {}) } };
 }
-const candyBalance = () => Math.max(0, progress.candies - (state.spent || 0));
 
-/* ------------------------------------------------------------------ */
-/* Progress                                                            */
-/* ------------------------------------------------------------------ */
-const progress = createProgress(state.progress);
-progress.on('levelup', (lv) => {
-  toast(`🎉 Level ${lv}! New wardrobe items unlocked`, 3400);
-  if (effectsOn()) effects.spawnConfetti(26, player.group.position);
-  buildWardrobePanel();
-});
-progress.on('candy', () => { updateStats(); renderShop(); });
-progress.on('quest', () => { updateTracker(); save(); });
+const effectsOn = () => !!state.settings.effects;
 
 /* ------------------------------------------------------------------ */
 /* Renderer / scene                                                    */
@@ -245,8 +210,7 @@ try {
   throw e;
 }
 /* device-aware quality: lower caps on touch devices */
-const maxDPR = isTouch ? 1.5 : 2;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDPR));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouch ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -274,13 +238,13 @@ scene.add(rim);
 function bgTexture(top, bot) {
   const c = document.createElement('canvas');
   c.width = 2; c.height = 512;
-  const ctx = c.getContext('2d');
-  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  const g = c.getContext('2d').createLinearGradient(0, 0, 0, 512);
   g.addColorStop(0, top);
   g.addColorStop(0.62, bot);
   g.addColorStop(1, bot);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 2, 512);
+  const ctx2 = c.getContext('2d');
+  ctx2.fillStyle = g;
+  ctx2.fillRect(0, 0, 2, 512);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -316,15 +280,15 @@ scene.add(studioGroup);
   const dot = (() => {
     const c = document.createElement('canvas');
     c.width = c.height = 64;
-    const ctx = c.getContext('2d');
-    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 30);
+    const ctx2 = c.getContext('2d');
+    const g = ctx2.createRadialGradient(32, 32, 0, 32, 32, 30);
     g.addColorStop(0, 'rgba(255,255,255,1)');
     g.addColorStop(0.35, 'rgba(255,255,255,0.7)');
     g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(32, 32, 30, 0, Math.PI * 2);
-    ctx.fill();
+    ctx2.fillStyle = g;
+    ctx2.beginPath();
+    ctx2.arc(32, 32, 30, 0, Math.PI * 2);
+    ctx2.fill();
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
@@ -366,7 +330,6 @@ const effects = createEffects(scene);
 const music = new Beatbox();
 music.muted = !state.settings.music;
 const input = createInput(canvas);
-const effectsOn = () => !!state.settings.effects;
 
 /* permanently collected candies (from save) */
 for (const c of world.candies) {
@@ -383,7 +346,7 @@ let currentChar = CHARACTERS.find((c) => c.id === state.character) || CHARACTERS
 let playerCfg = cfgFor(currentChar.id);
 let player = createDoll(playerCfg);
 studioGroup.add(player.group);
-player.group.position.y = 0.01;
+player.group.position.set(0, 0.01, 0);
 
 function rebuildPlayer(id) {
   const parent = player.group.parent;
@@ -397,11 +360,13 @@ function rebuildPlayer(id) {
     player.group.position.copy(world.spawn);
     player.group.rotation.y = Math.PI;
   } else if (game.mode === 'castle') {
-    player.group.position.set(0, 0, 3.8);
+    player.group.position.set(0, 0, 8.2);
     player.group.rotation.y = Math.PI;
   } else {
     player.group.position.y = 0.01;
   }
+  ctx.player = player;
+  ctx.currentChar = currentChar;
   state.character = id;
   rebuildNpcs();
   buildWardrobePanel();
@@ -410,198 +375,41 @@ function rebuildPlayer(id) {
 }
 
 /* ------------------------------------------------------------------ */
-/* NPCs                                                                */
+/* Game state + shared context                                         */
 /* ------------------------------------------------------------------ */
-let npcs = [];
-function rebuildNpcs() {
-  for (const n of npcs) {
-    n.doll.group.parent && n.doll.group.parent.remove(n.doll.group);
-    n.doll.dispose();
-  }
-  npcs = [];
-  const others = CHARACTERS.filter((c) => c.id !== currentChar.id && !c.royal);
-  others.forEach((ch, i) => {
-    const doll = createDoll(cfgFor(ch.id));
-    const home = world.homes.find((h) => h.npc === ch.id) || null;
-    /* some NPCs start at home */
-    const startHome = home && Math.random() < 0.25;
-    let p = null;
-    for (let k = 0; k < 30 && !p; k++) {
-      const a = (i / others.length) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
-      const r = 24 + Math.random() * 8;
-      const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (Math.abs(x) < 22.5 && Math.abs(z) < 22.5) continue;
-      if (z > 27 && z < 37) continue;
-      p = new THREE.Vector3(x, 0, z);
-    }
-    if (!p) p = new THREE.Vector3(24, 0, 24);
-    if (startHome) {
-      doll.group.position.copy(home.npcSpot);
-      home.interior.group.add(doll.group);
-    } else {
-      doll.group.position.copy(p);
-      world.group.add(doll.group);
-    }
-    doll.group.rotation.y = Math.random() * Math.PI * 2;
-    npcs.push({
-      doll, ch, home,
-      state: 'idle',
-      timer: 1 + Math.random() * 3,
-      target: startHome ? home.npcSpot.clone() : p.clone(),
-      speed: 2.2 + Math.random() * 1.2,
-      waveTimer: 0.5 + Math.random() * 3,
-      lastPos: doll.group.position.clone(),
-      stuckTimer: 0,
-      tick: i,
-      homeState: startHome ? 'home' : 'out',
-      homeTimer: 30 + Math.random() * 110,
-      goingHome: false,
-      sitting: false,
-    });
-  });
-}
-function pickNpcTarget(n) {
-  for (let k = 0; k < 20; k++) {
-    const a = Math.random() * Math.PI * 2;
-    const r = 23 + Math.random() * 16;
-    const x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (Math.abs(x) < 22.5 && Math.abs(z) < 22.5) continue;
-    if (z > 27) continue;
-    n.target.set(x, 0, z);
-    return;
-  }
-  n.target.set(0, 0, 26);
-}
-function pickInteriorTarget(n, bounds) {
-  n.target.set(
-    bounds.minX + Math.random() * (bounds.maxX - bounds.minX), 0,
-    bounds.minZ + Math.random() * (bounds.maxZ - bounds.minZ));
-}
-
-/* ------------------------------------------------------------------ */
-/* The royal family (live inside the castle, never leave)              */
-/* ------------------------------------------------------------------ */
-let royals = [];
-const ROYAL_SPOTS = {
-  jamoh: [2.6, -6.0], dama: [10.6, 2.4], ken: [9.2, -6.2],
-  fay: [9.8, 4.4], whitney: [9.5, -7.6], bleso: [-6.5, 6.2],
+const game = {
+  mode: 'studio',
+  danceT: 0,
+  spinT: 0,
+  vy: 0,
+  grounded: true,
+  walk01: 0,
+  doorHintShown: false,
+  chestHintShown: false,
+  trailTimer: 0,
+  mini: null,
 };
-function buildRoyals() {
-  for (const n of royals) {
-    n.doll.group.parent && n.doll.group.parent.remove(n.doll.group);
-    n.doll.dispose();
-  }
-  royals = [];
-  for (const ch of CHARACTERS.filter((c) => c.royal)) {
-    const doll = createDoll(cfgFor(ch.id));
-    const [hx, hz] = ROYAL_SPOTS[ch.id] || [0, 0];
-    doll.group.position.set(hx, 0, hz);
-    doll.group.rotation.y = Math.random() * Math.PI * 2;
-    world.castle.group.add(doll.group);
-    royals.push({
-      doll, ch,
-      state: 'idle',
-      timer: 1 + Math.random() * 4,
-      target: new THREE.Vector3(hx, 0, hz),
-      speed: 1.7 + Math.random() * 0.8,
-      waveTimer: 0.5 + Math.random() * 3,
-      lastPos: new THREE.Vector3(hx, 0, hz),
-      stuckTimer: 0,
-      tick: Math.random() * 10 | 0,
-      sitting: false,
-      sitSpot: null,
-    });
-  }
-}
-function nearestRoyal(maxD = 6.25) {
-  let best = null, bestD = maxD;
-  for (const n of royals) {
-    const d2 = n.doll.group.position.distanceToSquared(player.group.position);
-    if (d2 < bestD) { bestD = d2; best = n; }
-  }
-  return best;
-}
-function updateRoyal(n, dt, t) {
-  const p = n.doll.group.position;
-  _nToPlayer.subVectors(player.group.position, p);
-  const distToPlayer = _nToPlayer.length();
 
-  if (distToPlayer < 3) {
-    /* greet the visitor */
-    n.state = 'greet';
-    n.doll.setPose('stand');
-    n.sitting = false;
-    n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nToPlayer.x, _nToPlayer.z), Math.min(1, dt * 6));
-    n.waveTimer -= dt;
-    if (n.waveTimer <= 0) {
-      n.doll.wave();
-      n.waveTimer = 4 + Math.random() * 4;
-      if (effectsOn() && Math.random() < 0.4) effects.spawnHearts(1, p);
-    }
-    return;
-  }
-  if (n.sitting) {
-    n.timer -= dt;
-    if (n.timer <= 0) {
-      n.sitting = false;
-      n.doll.setPose('stand');
-      n.doll.group.position.y = 0;
-      n.state = 'idle';
-      n.timer = 0.6;
-    }
-    return;
-  }
-  if (n.state === 'idle') {
-    n.timer -= dt;
-    if (n.timer <= 0) {
-      if (Math.random() < 0.35) {
-        /* pick a chair and go sit */
-        const spot = world.castle.sits[(Math.random() * world.castle.sits.length) | 0];
-        n.target.set(spot.x, 0, spot.z);
-        n.sitSpot = spot;
-      } else {
-        pickInteriorTarget(n, world.castle.bounds);
-        n.sitSpot = null;
-      }
-      n.state = 'walk';
-    }
-    return;
-  }
-  /* walking */
-  _nDir.subVectors(n.target, p);
-  _nDir.y = 0;
-  const d = _nDir.length();
-  if (d < 0.35) {
-    if (n.sitSpot && Math.hypot(p.x - n.sitSpot.x, p.z - n.sitSpot.z) < 0.6) {
-      /* arrived at the chair — sit down */
-      n.sitting = true;
-      n.doll.setPose('sit');
-      n.doll.group.position.y = 0.12;
-      n.doll.group.rotation.y = n.sitSpot.ry;
-      n.timer = 7 + Math.random() * 10;
-      n.state = 'sit';
-    } else {
-      n.state = 'idle';
-      n.timer = 1.5 + Math.random() * 3.5;
-    }
-  } else {
-    _nDir.multiplyScalar((n.speed * dt) / d);
-    p.x += _nDir.x;
-    p.z += _nDir.z;
-    n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nDir.x, _nDir.z), Math.min(1, dt * 6));
-  }
-  resolveCastleCollisions(p, 0.26);
-  n.stuckTimer += dt;
-  if (n.stuckTimer > 1.6) {
-    if (p.distanceToSquared(n.lastPos) < 0.09) {
-      pickInteriorTarget(n, world.castle.bounds);
-      n.sitSpot = null;
-      if (n.state === 'idle') n.timer = 0.2;
-    }
-    n.lastPos.copy(p);
-    n.stuckTimer = 0;
-  }
-}
+ctx.CHARACTERS = CHARACTERS;
+ctx.state = state;
+ctx.progress = progress;
+ctx.save = save;
+ctx.isTouch = isTouch;
+ctx.scene = scene;
+ctx.camera = camera;
+ctx.view = { studioBg, worldBg, studioFog, worldFog, castleFog };
+ctx.world = world;
+ctx.effects = effects;
+ctx.music = music;
+ctx.game = game;
+ctx.player = player;
+ctx.currentChar = currentChar;
+ctx.cfgFor = cfgFor;
+ctx.quests = { QUESTS, royalsMet, updateTracker, renderJournal, completeQuest };
+ctx.inventory = { SHOP, candyBalance, renderShop, buyItem };
+ctx.minigames = { startMini, cancelMini, updateMini };
+ctx.homes = { getActiveHome, enterHome, leaveHome, nearestHomeDoor, playerSit };
+ctx.pet = { setPet: (id) => setPet(id), reparentPet };
 
 /* ------------------------------------------------------------------ */
 /* Camera                                                              */
@@ -611,6 +419,7 @@ const cam = {
   target: new THREE.Vector3(0, 0.85, 0),
   lastUser: -10,
 };
+ctx.cam = cam;
 input.onDrag((dx, dy) => {
   cam.yaw -= dx * 0.005;
   cam.pitch = THREE.MathUtils.clamp(cam.pitch + dy * 0.004, 0.12, 1.15);
@@ -636,12 +445,13 @@ function updateCamera(dt, auto) {
 /* ------------------------------------------------------------------ */
 /* UI helpers                                                          */
 /* ------------------------------------------------------------------ */
-const $ = (id) => document.getElementById(id);
 const titleEl = $('title'), hudEl = $('hud'), panelEl = $('panel'), actionbarEl = $('actionbar');
 const joyEl = $('joy'), toastEl = $('toast'), statsEl = $('stats'), trackerEl = $('tracker');
 const dialogueEl = $('dialogue'), settingsEl = $('settings'), loadingEl = $('loading');
 const journalEl = $('journal'), shopEl = $('shop');
 const charRowEl = $('charRow'), charInfoEl = $('charInfo');
+
+ctx.ui = { toast, updateStats, renderCharInfo, buildWardrobePanel, effectsOn, updateHud };
 
 let toastTimer = null;
 function toast(msg, ms = 2600) {
@@ -660,183 +470,13 @@ function updateHud() {
     <small>${currentChar.title} · speed ${currentChar.speed.toFixed(1)} · jump ${currentChar.jump.toFixed(1)}</small>`;
 }
 
-/* ------------------------------------------------------------------ */
-/* Quests                                                              */
-/* ------------------------------------------------------------------ */
-const QUESTS = [
-  { id: 'sweetTooth', icon: '🍬', title: 'Sweet Tooth', reward: 15, auto: true,
-    desc: () => 'Collect 5 candies',
-    prog: () => `${Math.min(progress.candies, 5)}/5 candies` },
-  { id: 'royalVisit', icon: '🏰', title: 'Royal Visit', reward: 20, auto: true,
-    desc: () => 'Visit the candy castle beyond the maze',
-    prog: () => 'Visit the castle',
-    target: () => world.castleDoor },
-  { id: 'rainbowCross', icon: '🌈', title: 'Over the Rainbow', reward: 15, auto: true,
-    desc: () => 'Cross the chocolate river on a donut',
-    prog: () => 'Cross at a donut' },
-  { id: 'goldenBear', icon: '🧸', title: 'The Lost Gummy', reward: 25, auto: true,
-    desc: () => 'Find the golden gummy bear behind the cream hills',
-    prog: () => 'Find the golden bear' },
-  { id: 'homeSweet', icon: '🏡', title: 'Home Sweet Home', reward: 30, auto: true,
-    desc: () => (progress.questStage('homeSweet') === 1
-      ? 'Meet your friend at the gumdrop village'
-      : 'Talk to a friend, then meet them at the village'),
-    prog: () => (progress.questStage('homeSweet') === 1 ? 'Go to the village' : 'Talk to a friend (E)'),
-    target: () => (progress.questStage('homeSweet') === 1 ? world.villagePos : null) },
-  { id: 'forestRamble', icon: '🌳', title: "Zuri's Forest Ramble", reward: 20, giver: 'zuri',
-    desc: () => 'Meet Zuri by the giant lollipop in the north-west forest',
-    prog: () => 'Reach the giant lollipop',
-    target: () => world.bigLollipop },
-  { id: 'princeFavor', icon: '👑', title: "A Prince's Favor", reward: 25, giver: 'theo',
-    desc: () => 'Gather 8 candies and present them to Theo',
-    prog: () => `${Math.min(candyBalance(), 8)}/8 candies, then talk to Theo`,
-    target: () => npcById('theo') },
-  { id: 'peakSightseer', icon: '🍦', title: "Amani's Peak Challenge", reward: 20, giver: 'amani',
-    desc: () => 'Cross the river and gaze upon the ice cream peaks',
-    prog: () => 'Travel beyond the mountains\' foothills (far north)',
-    target: () => world.peaks },
-  { id: 'royalTreasure', icon: '🗝️', title: 'The Royal Vault', reward: 30, auto: true,
-    desc: () => 'Open the treasure chest inside the candy castle',
-    prog: () => 'Open the chest in the castle',
-    target: () => world.castleDoor },
-  { id: 'royalDecree', icon: '👑', title: "The King's Decree", reward: 30, giver: 'jamoh',
-    desc: () => 'Meet the royal family inside the palace (Dama, Ken, Fay, Whitney, Bleso)',
-    prog: () => `Met ${royalsMet()} of 5 family members`,
-    target: () => world.castleDoor },
-  { id: 'queensGame', icon: '🎮', title: "The Queen's Arcade", reward: 30, giver: 'dama',
-    desc: () => 'Score 10 or better at the Candy Catch arcade (village kiosk)',
-    prog: () => `Best score: ${state.progress.games.catchBest} / 10`,
-    target: () => world.arcades[0].pos },
-  { id: 'ringChampion', icon: '🏁', title: "Ken's Gummy Rush", reward: 30, giver: 'ken',
-    desc: () => `Finish the Gummy Rush race in under ${RACE_PAR} seconds`,
-    prog: () => state.progress.games.raceBest
-      ? `Best time: ${state.progress.games.raceBest.toFixed(1)}s · par ${RACE_PAR}s`
-      : `Run the race at the blue kiosk · par ${RACE_PAR}s`,
-    target: () => world.arcades[1].pos },
-];
-const questGiven = (q) => q.auto || progress.questStage(q.id) !== 0;
-function npcById(id) {
-  const n = npcs.find((x) => x.ch.id === id);
-  if (!n) return null;
-  if (n.homeState === 'home' && n.home) return n.home.door;
-  return n.doll.group.position;
-}
-const ROYAL_FAMILY = ['dama', 'ken', 'fay', 'whitney', 'bleso'];
-const royalsMet = () => ROYAL_FAMILY.filter((id) => state.progress.met[id]).length;
-const RACE_PAR = 75;
-
-function activeQuest() {
-  return QUESTS.find((q) => !progress.isQuestDone(q.id) && questGiven(q)) || null;
-}
-
-function updateTracker() {
-  if (game.mode !== 'world') { trackerEl.innerHTML = ''; world.setBeacon(null); return; }
-  if (game.mini) {
-    trackerEl.innerHTML = game.mini.kind === 'catch'
-      ? `🍭 <b>Candy Catch</b><br><span class="tprog">score <b>${game.mini.score}</b> · ${Math.ceil(Math.max(0, game.mini.t))}s left</span>`
-      : `🏁 <b>Gummy Rush</b> — ring <b>${Math.min(game.mini.idx + 1, world.racePath.length)}/${world.racePath.length}</b><br><span class="tprog">${game.mini.t.toFixed(1)}s · par ${RACE_PAR}s</span>`;
-    world.setBeacon(null);
-    return;
-  }
-  const q = activeQuest();
-  if (!q) {
-    trackerEl.innerHTML = '✨ <b>All quests complete!</b>';
-    world.setBeacon(null);
-    return;
-  }
-  let dist = '';
-  if (q.target) {
-    const tp = q.target();
-    if (tp) {
-      const d = Math.round(Math.hypot(player.group.position.x - tp.x, player.group.position.z - tp.z));
-      dist = ` · ${d}m`;
-      world.setBeacon(tp.x, tp.z);
-    } else {
-      world.setBeacon(null);
-    }
-  } else {
-    world.setBeacon(null);
-  }
-  trackerEl.innerHTML = `${q.icon} <b>${q.title}</b><br><span class="tprog">${q.prog()}${dist}</span>`;
-}
-
-function renderJournal() {
-  const list = $('journalList');
-  list.innerHTML = '';
-  for (const q of QUESTS) {
-    const done = progress.isQuestDone(q.id);
-    const given = questGiven(q);
-    const row = document.createElement('div');
-    row.className = 'quest-row' + (done ? ' done' : '');
-    const st = done
-      ? '<div class="qr-state complete">✅ COMPLETE</div>'
-      : given
-        ? '<div class="qr-state active">🔄 IN PROGRESS</div>'
-        : `<div class="qr-state hint">💡 TALK TO ${nameOf(q.giver).toUpperCase()}</div>`;
-    row.innerHTML = `
-      <div class="qr-head"><span>${q.icon} ${q.title}</span><span class="qr-reward">+${q.reward} XP</span></div>
-      <div class="qr-desc">${q.desc()}</div>
-    ${given ? `<div class="qr-desc"><b>${q.prog()}</b></div>` : ''}
-    ${st}`;
-    list.appendChild(row);
-  }
-  /* arcade records */
-  const games = state.progress.games;
-  const sec = document.createElement('div');
-  sec.className = 'quest-row games-row';
-  sec.innerHTML = `
-    <div class="qr-head"><span>🎮 Arcade Records</span></div>
-    <div class="qr-desc">🍭 Candy Catch — best score: <b>${games.catchBest}</b> (kiosk in the village)</div>
-    <div class="qr-desc">🏁 Gummy Rush — best time: <b>${games.raceBest !== null && games.raceBest !== undefined ? games.raceBest.toFixed(1) + 's' : '—'}</b> · par ${RACE_PAR}s (blue kiosk)</div>`;
-  list.appendChild(sec);
-}
-function nameOf(id) {
-  const c = CHARACTERS.find((x) => x.id === id);
-  return c ? c.name : id;
-}
-
-function completeQuest(id) {
-  if (progress.isQuestDone(id)) return;
-  const q = QUESTS.find((x) => x.id === id);
-  progress.setQuestStage(id, 'done');
-  progress.addXP(q.reward);
-  toast(`✅ Quest complete: <b>${q.title}</b> (+${q.reward} XP)`, 3400);
-  if (effectsOn()) {
-    effects.spawnConfetti(30, player.group.position);
-    effects.spawnHearts(4, player.group.position);
-  }
-  updateStats();
-  updateTracker();
-  renderJournal();
-  save();
-}
-
-const _questV = new THREE.Vector3();
-function updateQuests() {
-  const p = player.group.position;
-  if (!progress.isQuestDone('sweetTooth') && progress.candies >= 5) completeQuest('sweetTooth');
-  if (!progress.isQuestDone('royalVisit') && p.distanceTo(world.castleDoor) < 6) completeQuest('royalVisit');
-  if (!progress.isQuestDone('rainbowCross')) {
-    for (const d of world.donuts) {
-      _questV.set(d.x, p.y, d.z);
-      if (p.distanceTo(_questV) < 2.8) { completeQuest('rainbowCross'); break; }
-    }
-  }
-  if (!progress.isQuestDone('goldenBear') && !world.goldenBear.active) completeQuest('goldenBear');
-  if (!progress.isQuestDone('homeSweet') && progress.questStage('homeSweet') === 1 && p.distanceTo(world.villagePos) < 5) {
-    completeQuest('homeSweet');
-  }
-  if (!progress.isQuestDone('forestRamble') && progress.questStage('forestRamble') === 1 && p.distanceTo(world.bigLollipop) < 6) {
-    completeQuest('forestRamble');
-  }
-  if (!progress.isQuestDone('peakSightseer') && progress.questStage('peakSightseer') === 1 && p.z > 45) {
-    completeQuest('peakSightseer');
-  }
-  if (!progress.isQuestDone('royalTreasure') && world.castle.chest.opened) completeQuest('royalTreasure');
-  if (!progress.isQuestDone('royalDecree') && progress.questStage('royalDecree') === 1 && royalsMet() >= 5) {
-    completeQuest('royalDecree');
-  }
-}
+progress.on('levelup', (lv) => {
+  toast(`🎉 Level ${lv}! New wardrobe items unlocked`, 3400);
+  if (effectsOn()) effects.spawnConfetti(26, player.group.position);
+  buildWardrobePanel();
+});
+progress.on('candy', () => { updateStats(); renderShop(); });
+progress.on('quest', () => { updateTracker(); save(); });
 
 /* ------------------------------------------------------------------ */
 /* Character chips                                                     */
@@ -1044,74 +684,7 @@ function syncUI() {
 buildWardrobePanel();
 
 /* ------------------------------------------------------------------ */
-/* Candy boutique (shop)                                               */
-/* ------------------------------------------------------------------ */
-const SHOP = [
-  { id: 'candycane', icon: '🍭', name: 'Candy Cane Outfit', price: 15, desc: 'A stripey sweet outfit for any doll.' },
-  { id: 'rainbow', icon: '🌈', name: 'Rainbow Gown', price: 20, desc: 'A swirling rainbow skirt (girls · also unlocks at Lv 2).' },
-  { id: 'star', icon: '✨', name: 'Star Suit', price: 20, desc: 'A suit sprinkled with stars (boys · also unlocks at Lv 2).' },
-  { id: 'wand', icon: '🪄', name: 'Star Wand', price: 25, desc: 'A twinkling wand held in the right hand.' },
-  { id: 'wings', icon: '🦋', name: 'Butterfly Wings', price: 35, desc: 'Flapping rainbow wings (also unlocks at Lv 3).' },
-  { id: 'trail', icon: '💫', name: 'Sparkle Trail', price: 35, desc: 'Leave sparkles wherever you run.' },
-  ...PETS.map((p) => ({ id: 'pet_' + p.id, icon: p.icon, name: p.name, price: p.price, desc: p.desc + ' Follows you everywhere.', pet: p.id })),
-  { id: 'halo', icon: '🌟', name: 'Golden Halo', price: 50, desc: 'A glowing halo (also unlocks at Lv 4).' },
-];
-function renderShop() {
-  const balance = candyBalance();
-  $('shopBalance').textContent = `Your candies: 🍬 ${balance}`;
-  const list = $('shopList');
-  if (!list) return;
-  list.innerHTML = '';
-  for (const item of SHOP) {
-    const owned = !!state.purchases[item.id];
-    const row = document.createElement('div');
-    row.className = 'shop-row' + (owned ? ' owned' : '');
-    const btn = document.createElement('button');
-    btn.className = 'sr-buy';
-    if (owned) { btn.textContent = '✓ Owned'; btn.disabled = true; }
-    else {
-      btn.textContent = `Buy · 🍬 ${item.price}`;
-      btn.disabled = balance < item.price;
-      btn.addEventListener('click', () => buyItem(item));
-    }
-    row.innerHTML = `
-      <div class="sr-icon">${item.icon}</div>
-      <div class="sr-body">
-        <div class="sr-name">${item.name}</div>
-        <div class="sr-desc">${item.desc}</div>
-      </div>`;
-    row.appendChild(btn);
-    list.appendChild(row);
-  }
-}
-function buyItem(item) {
-  const balance = candyBalance();
-  if (balance < item.price || state.purchases[item.id]) return;
-  state.spent += item.price;
-  state.purchases[item.id] = true;
-  if (item.pet && !state.settings.pet) {
-    setPet(item.pet); /* auto-equip the first pet */
-  } else {
-    save();
-  }
-  toast(item.pet
-    ? `🐾 <b>${item.name}</b> joins your adventure!`
-    : `🛍️ Purchased <b>${item.name}</b>! Equip it in the wardrobe.`, 3200);
-  if (effectsOn()) effects.spawnConfetti(16, player.group.position);
-  updateStats();
-  renderShop();
-  renderCharInfo();
-  buildWardrobePanel();
-}
-function openShop() {
-  renderShop();
-  shopEl.classList.remove('hidden');
-  closeJournal();
-}
-function closeShop() { shopEl.classList.add('hidden'); }
-
-/* ------------------------------------------------------------------ */
-/* Pets — follow the player everywhere                                  */
+/* Pets — follow the player everywhere                                 */
 /* ------------------------------------------------------------------ */
 let petObj = null;
 const _petFollow = new THREE.Vector3();
@@ -1148,115 +721,14 @@ function updatePet(dt, t) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Mini-games (arcade kiosks)                                           */
+/* Shop / journal overlays                                             */
 /* ------------------------------------------------------------------ */
-const CATCH_GEO = new THREE.SphereGeometry(0.2, 12, 10);
-const CATCH_MATS = ['#ff8fb7', '#ffd45e', '#63b8f5', '#a7d97a', '#b57de0', '#ff9e4f']
-  .map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3, roughness: 0.3 }));
-function startMini(kind) {
-  if (game.mini) { toast('🎮 Finish the current game first!', 2000); return; }
-  if (kind === 'catch') {
-    game.mini = { kind: 'catch', t: 45, score: 0, spawn: 0.2, items: [] };
-    toast('🍭 <b>Candy Catch!</b> Sweets rain from the sky — run and grab them!<br><small>45 seconds · rewards candies</small>', 4200);
-  } else {
-    game.mini = { kind: 'race', idx: 0, t: 0 };
-    for (const r of world.raceRings) { r.visible = true; r.scale.set(1, 1, 1); }
-    toast(`🏁 <b>Gummy Rush!</b> Sprint through the 6 golden rings in order!<br><small>Par time: ${RACE_PAR}s · rewards candies</small>`, 4200);
-  }
-  music.start('dance');
-  if (effectsOn()) effects.spawnConfetti(12, player.group.position);
-  updateTracker();
+function openShop() {
+  renderShop();
+  shopEl.classList.remove('hidden');
+  closeJournal();
 }
-function cancelMini(silent) {
-  if (!game.mini) return;
-  for (const m of game.mini.items || []) world.group.remove(m);
-  for (const r of world.raceRings) { r.visible = false; r.scale.set(1, 1, 1); }
-  game.mini = null;
-  if (!silent) { music.start('ambient'); updateTracker(); }
-}
-function finishCatch() {
-  const mini = game.mini;
-  const g = state.progress.games;
-  const score = mini.score;
-  const first = !g.catchFirst && score >= 3;
-  const reward = first ? Math.min(20, Math.max(2, score)) : Math.min(6, Math.floor(score / 3));
-  if (score > g.catchBest) g.catchBest = score;
-  if (score >= 3) g.catchFirst = true;
-  cancelMini(true);
-  if (reward > 0) progress.addCandies(reward);
-  music.start('ambient');
-  toast(`🍭 <b>Candy Catch over!</b> Score: <b>${score}</b> · best ${g.catchBest} · <b>+${reward} candies</b>${first ? ' 🎉' : ''}`, 4200);
-  updateStats(); save(); updateTracker();
-}
-function finishRace() {
-  const mini = game.mini;
-  const time = mini.t;
-  const g = state.progress.games;
-  const isRecord = g.raceBest === null || time < g.raceBest;
-  if (isRecord) g.raceBest = Math.round(time * 10) / 10;
-  const win = time <= RACE_PAR;
-  const first = win && !g.raceFirst;
-  const reward = first ? 15 : (win ? 5 : 2);
-  if (win) g.raceFirst = true;
-  cancelMini(true);
-  progress.addCandies(reward);
-  music.start('ambient');
-  if (effectsOn()) effects.spawnConfetti(30, player.group.position);
-  toast(`🏁 <b>Race finished!</b> Time <b>${time.toFixed(1)}s</b>${isRecord ? ' · new best!' : ''} · <b>+${reward} candies</b>${win ? '' : ' (over par)'}`, 4200);
-  updateStats(); save(); updateTracker();
-}
-function updateMini(dt, t) {
-  const mini = game.mini;
-  if (!mini) return;
-  const p = player.group.position;
-  if (mini.kind === 'catch') {
-    mini.t -= dt;
-    mini.spawn -= dt;
-    if (mini.spawn <= 0 && mini.items.length < 14) {
-      mini.spawn = Math.max(0.4, 0.85 - mini.score * 0.02);
-      const m = new THREE.Mesh(CATCH_GEO, CATCH_MATS[(Math.random() * CATCH_MATS.length) | 0]);
-      m.position.set(p.x + (Math.random() - 0.5) * 9, 8.5, p.z + (Math.random() - 0.5) * 9);
-      world.group.add(m);
-      mini.items.push(m);
-    }
-    for (let i = mini.items.length - 1; i >= 0; i--) {
-      const m = mini.items[i];
-      m.position.y -= dt * (3.1 + Math.min(1.4, mini.score * 0.02));
-      m.rotation.y += dt * 3;
-      const dx = p.x - m.position.x, dz = p.z - m.position.z;
-      if (m.position.y < 1.8 && m.position.y > 0.2 && dx * dx + dz * dz < 1.1) {
-        mini.score++;
-        world.group.remove(m);
-        mini.items.splice(i, 1);
-        if (effectsOn()) effects.spawnHearts(1, m.position);
-        continue;
-      }
-      if (m.position.y < 0.22) { world.group.remove(m); mini.items.splice(i, 1); }
-    }
-    if (mini.t <= 0) finishCatch();
-  } else {
-    mini.t += dt;
-    const ring = world.raceRings[mini.idx];
-    if (ring) {
-      const s = 1 + Math.sin(t * 6) * 0.14;
-      ring.scale.set(s, s, s);
-      ring.rotation.y += dt * 0.8;
-      const tp = world.racePath[mini.idx];
-      if (Math.hypot(p.x - tp.x, p.z - tp.z) < 2.6) {
-        ring.visible = false;
-        ring.scale.set(1, 1, 1);
-        mini.idx++;
-        if (effectsOn()) effects.spawnConfetti(8, new THREE.Vector3(tp.x, 1.4, tp.z));
-        if (mini.idx >= world.racePath.length) finishRace();
-        else toast(`🏁 Ring <b>${mini.idx}/${world.racePath.length}</b>!`, 1400);
-      }
-    }
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* Quest journal overlay                                               */
-/* ------------------------------------------------------------------ */
+function closeShop() { shopEl.classList.add('hidden'); }
 function openJournal() {
   renderJournal();
   journalEl.classList.remove('hidden');
@@ -1267,19 +739,6 @@ function closeJournal() { journalEl.classList.add('hidden'); }
 /* ------------------------------------------------------------------ */
 /* Modes                                                               */
 /* ------------------------------------------------------------------ */
-const game = {
-  mode: 'studio',
-  danceT: 0,
-  spinT: 0,
-  vy: 0,
-  grounded: true,
-  walk01: 0,
-  doorHintShown: false,
-  chestHintShown: false,
-  trailTimer: 0,
-  mini: null,
-};
-
 function enterWorld() {
   game.mode = 'world';
   state.mode = 'world';
@@ -1291,6 +750,7 @@ function enterWorld() {
   if (isTouch) joyEl.classList.add('show');
   document.body.classList.add('mode-world');
 
+  hideAllInteriors();
   exitCastleScene();
   studioGroup.visible = false;
   world.group.visible = true;
@@ -1333,6 +793,7 @@ function enterStudio() {
   game.danceT = 0;
   if (music.ctx) music.start('ambient');
 
+  hideAllInteriors();
   exitCastleScene();
   world.group.visible = false;
   studioGroup.visible = true;
@@ -1381,8 +842,7 @@ function enterCastle() {
 }
 function exitCastleScene() {
   world.castle.group.visible = false;
-  for (const h of world.homes) h.interior.group.visible = false;
-  activeHome = null;
+  hideAllInteriors();
 }
 function leaveCastle() {
   game.mode = 'world';
@@ -1405,223 +865,22 @@ function leaveCastle() {
 }
 
 /* ------------------------------------------------------------------ */
-/* NPC homes (enterable)                                               */
+/* Chest                                                               */
 /* ------------------------------------------------------------------ */
-let activeHome = null;
-function enterHome(home) {
-  cancelMini(true);
-  game.mode = 'house';
-  activeHome = home;
-  world.group.visible = false;
-  world.setBeacon(null);
-  trackerEl.innerHTML = '';
-  home.interior.group.visible = true;
-  scene.background = studioBg;
-  scene.fog = castleFog;
-
-  home.interior.group.add(player.group);
-  player.group.position.set(0, 0, 1.6);
-  player.group.rotation.y = Math.PI;
-  game.vy = 0;
-  game.walk01 = 0;
-  game.doorHintShown = false;
-  if (player.sitting()) player.setPose('stand');
-
-  cam.target.set(0, 1.1, 1.0);
-  cam.yaw = 0; cam.pitch = 0.4; cam.dist = 4.4;
-  camera.position.set(0, 2.4, 5.6);
-  const who = nameOf(home.npc);
-  toast(`🏡 <b>${who}'s Home</b> — make yourself comfortable!<br><small>${who} wanders in and out… sit on a chair, say hello</small>`, 3600);
-  reparentPet();
-  save();
-}
-function leaveHome() {
-  if (!activeHome) return;
-  const home = activeHome;
-  game.mode = 'world';
-  home.interior.group.visible = false;
-  activeHome = null;
-  world.group.visible = true;
-  scene.background = worldBg;
-  scene.fog = worldFog;
-
-  world.group.add(player.group);
-  player.group.position.copy(home.exit);
-  player.group.position.y = 0;
-  player.group.rotation.y = Math.atan2(home.exit.x - home.pos.x, home.exit.z - home.pos.z);
-  if (player.sitting()) player.setPose('stand');
-  game.doorHintShown = false;
-  cam.target.set(player.group.position.x, 1.1, player.group.position.z);
-  updateTracker();
-  reparentPet();
-  save();
-}
-function nearestHomeDoor() {
-  let best = null, bestD = 9.6; /* ~3.1m squared */
-  for (const h of world.homes) {
-    const d2 = player.group.position.distanceToSquared(h.door);
-    if (d2 < bestD) { bestD = d2; best = h; }
-  }
-  return best;
-}
-function nearestArcade() {
-  let best = null, bestD = 7.8; /* ~2.8m squared */
-  for (const a of world.arcades) {
-    const d2 = player.group.position.distanceToSquared(a.pos);
-    if (d2 < bestD) { bestD = d2; best = a; }
-  }
-  return best;
-}
-
-/* sit the player on a spot (chair / sofa / throne) */
-function playerSit(spot, label) {
-  player.group.position.set(spot.x, 0.18, spot.z);
-  player.group.rotation.y = spot.ry;
-  player.setPose('sit');
-  player.boing();
-  if (effectsOn()) effects.spawnHearts(2, player.group.position);
-  toast(label || '😌 You sit down. <i>Move to stand up.</i>', 2600);
-}
-
-/* ------------------------------------------------------------------ */
-/* NPC dialogue with choices                                           */
-/* ------------------------------------------------------------------ */
-let dialogueOpen = false;
-let dialogueTimer = null;
-function closeDialogue() {
-  dialogueEl.classList.remove('show', 'interactive');
-  dialogueOpen = false;
-  clearTimeout(dialogueTimer);
-}
-function dialogueHtml(name, emoji, text, choices) {
-  dialogueEl.innerHTML = `<b>${emoji} ${name}</b><br>“${text}”` +
-    (choices ? `<div class="dchoices">${choices}</div>` : '');
-  dialogueEl.classList.add('show', 'interactive');
-  dialogueOpen = true;
-  clearTimeout(dialogueTimer);
-  /* auto-hide casual chatter, but keep choice dialogs open until answered */
-  if (!choices) dialogueTimer = setTimeout(() => closeDialogue(), 7000);
-}
-function dchoiceBtn(label, fn, isQuest) {
-  const b = document.createElement('button');
-  b.className = 'dchoice' + (isQuest ? ' quest' : '');
-  b.innerHTML = label;
-  b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
-  return b;
-}
-
-function nearestNpc() {
-  let best = null, bestD = 25;
-  for (const n of npcs) {
-    if (n.homeState === 'home') continue; /* inside their house */
-    const d2 = n.doll.group.position.distanceToSquared(player.group.position);
-    if (d2 < bestD) { bestD = d2; best = n; }
-  }
-  return best;
-}
-
-function npcQuestAction(n) {
-  const q = n.ch.quest;
-  const stage = progress.questStage(q.id);
-  if (stage === 'done') {
-    dialogueHtml(n.ch.name, n.ch.emoji, q.done, null);
-    return;
-  }
-  if (stage === 0) {
-    progress.setQuestStage(q.id, 1);
-    save();
-    updateTracker();
-    renderJournal();
-    dialogueHtml(n.ch.name, n.ch.emoji, q.offer, null);
-    toast(`📜 New quest: <b>${QUESTS.find((x) => x.id === q.id).title}</b>`, 3000);
-    return;
-  }
-  /* active */
-  if (q.id === 'princeFavor') {
-    if (candyBalance() >= 8) {
-      state.spent += 8; /* the candies are handed over */
-      completeQuest(q.id);
-      dialogueHtml(n.ch.name, n.ch.emoji, q.done, null);
-      updateStats();
-    } else {
-      const need = 8 - candyBalance();
-      dialogueHtml(n.ch.name, n.ch.emoji, q.active.replace('{N}', need), null);
+function openChest() {
+  const chest = world.castle.chest;
+  if (!chest.opened) {
+    chest.opened = true;
+    chest.anim = 1;
+    progress.addCandies(8);
+    completeQuest('royalTreasure');
+    if (effectsOn()) {
+      effects.spawnConfetti(40, chest.group.position.clone().add(new THREE.Vector3(0, 1, 0)));
+      effects.spawnHearts(5, player.group.position);
     }
-    return;
-  }
-  if (q.id === 'royalDecree') {
-    if (royalsMet() >= 5) {
-      completeQuest(q.id);
-      dialogueHtml(n.ch.name, n.ch.emoji, q.done, null);
-    } else {
-      dialogueHtml(n.ch.name, n.ch.emoji, q.active.replace('{N}', royalsMet()), null);
-    }
-    return;
-  }
-  if (q.id === 'queensGame') {
-    if (state.progress.games.catchBest >= 10) {
-      completeQuest(q.id);
-      dialogueHtml(n.ch.name, n.ch.emoji, q.done, null);
-    } else {
-      dialogueHtml(n.ch.name, n.ch.emoji, q.active.replace('{N}', state.progress.games.catchBest), null);
-    }
-    return;
-  }
-  if (q.id === 'ringChampion') {
-    const best = state.progress.games.raceBest;
-    if (best !== null && best <= RACE_PAR) {
-      completeQuest(q.id);
-      dialogueHtml(n.ch.name, n.ch.emoji, q.done, null);
-    } else {
-      dialogueHtml(n.ch.name, n.ch.emoji,
-        q.active.replace('{N}', best === null ? 'no time yet' : best.toFixed(1) + 's').replace('{PAR}', RACE_PAR), null);
-    }
-    return;
-  }
-  dialogueHtml(n.ch.name, n.ch.emoji, q.active, null);
-}
-
-function talkToNpc(n) {
-  n.doll.wave();
-  const line = n.ch.lines[(Math.random() * n.ch.lines.length) | 0];
-  const choices = [];
-  if (n.ch.quest) {
-    const stage = progress.questStage(n.ch.quest.id);
-    const label = stage === 0 ? '📜 Quest' : (stage === 'done' ? '📜 Quest' : '📜 How goes it?');
-    choices.push(dchoiceBtn(label, () => npcQuestAction(n), true));
-  }
-  choices.push(dchoiceBtn('💬 Chat', () => {
-    const l = n.ch.lines[(Math.random() * n.ch.lines.length) | 0];
-    dialogueHtml(n.ch.name, n.ch.emoji, l, null);
-  }));
-  choices.push(dchoiceBtn('👋 Bye', closeDialogue));
-  dialogueHtml(n.ch.name, n.ch.emoji, line, null);
-  /* render choice buttons after the line */
-  const wrap = document.createElement('div');
-  wrap.className = 'dchoices';
-  for (const c of choices) wrap.appendChild(c);
-  dialogueEl.appendChild(wrap);
-
-  /* escort quest: first talk sets homeSweet stage */
-  if (!progress.isQuestDone('homeSweet') && progress.questStage('homeSweet') === 0) {
-    progress.setQuestStage('homeSweet', 1);
-    toast(`🏡 <b>${n.ch.name}</b> will meet you at the gumdrop village!`, 3200);
-    updateTracker();
-    save();
-  }
-
-  /* the King's decree: remember which royals you have met */
-  if (n.ch.royal && !state.progress.met[n.ch.id]) {
-    state.progress.met[n.ch.id] = true;
-    save();
-    if (progress.questStage('royalDecree') === 1 && !progress.isQuestDone('royalDecree')) {
-      updateTracker();
-      if (n.ch.id !== 'jamoh') toast(`👑 Family met: <b>${royalsMet()}/5</b>`, 2000);
-    } else if (n.ch.id !== 'jamoh' && !state.progress.met.__royalHello) {
-      state.progress.met.__royalHello = true;
-      toast('👑 You met the royal family! Talk to <b>King Jamoh</b> for his decree.', 3200);
-      save();
-    }
+    toast('🗝️ The royal vault opens — <b>+8 candies</b>!', 3400);
+  } else {
+    toast('The vault is empty… but the memory of candy remains 🍬', 2400);
   }
 }
 
@@ -1656,7 +915,7 @@ function interact() {
     toast('Nobody is close enough to talk to 🤔 — walk up to a doll!', 2200);
   } else if (game.mode === 'house') {
     /* the owner might be home */
-    const owner = npcs.find((x) => x.home === activeHome);
+    const owner = npcs.find((x) => x.home === getActiveHome());
     if (owner && owner.homeState === 'home' &&
         owner.doll.group.position.distanceTo(player.group.position) < 2.6) {
       talkToNpc(owner);
@@ -1668,13 +927,13 @@ function interact() {
       return;
     }
     /* chairs */
-    for (const s of activeHome.interior.sits) {
+    for (const s of getActiveHome().interior.sits) {
       if (Math.hypot(player.group.position.x - s.x, player.group.position.z - s.z) < 1.4) {
         playerSit(s);
         return;
       }
     }
-    toast(`${nameOf(activeHome.npc)} is out exploring — come back later! 🚶`, 2400);
+    toast(`${nameOf(getActiveHome().npc)} is out exploring — come back later! 🚶`, 2400);
   } else if (game.mode === 'castle') {
     /* near door -> leave */
     if (player.group.position.z > 7.8 && Math.abs(player.group.position.x) < 1.3) {
@@ -1711,21 +970,13 @@ function interact() {
   }
 }
 
-function openChest() {
-  const chest = world.castle.chest;
-  if (!chest.opened) {
-    chest.opened = true;
-    chest.anim = 1;
-    progress.addCandies(8);
-    completeQuest('royalTreasure');
-    if (effectsOn()) {
-      effects.spawnConfetti(40, chest.group.position.clone().add(new THREE.Vector3(0, 1, 0)));
-      effects.spawnHearts(5, player.group.position);
-    }
-    toast('🗝️ The royal vault opens — <b>+8 candies</b>!', 3400);
-  } else {
-    toast('The vault is empty… but the memory of candy remains 🍬', 2400);
+function nearestArcade() {
+  let best = null, bestD = 7.8; /* ~2.8m squared */
+  for (const a of world.arcades) {
+    const d2 = player.group.position.distanceToSquared(a.pos);
+    if (d2 < bestD) { bestD = d2; best = a; }
   }
+  return best;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1797,7 +1048,7 @@ $('optEffects').addEventListener('change', (e) => {
   save();
 });
 $('btnReset').addEventListener('click', () => {
-  try { localStorage.removeItem(STORE_KEY); } catch { /* ignore */ }
+  try { localStorage.removeItem(saveMod.STORE_KEY); } catch { /* ignore */ }
   location.reload();
 });
 function setShadows(on) {
@@ -1805,6 +1056,72 @@ function setShadows(on) {
   key.castShadow = on;
   scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
 }
+
+/* graphics quality (mobile-friendly presets) */
+const QUALITY_ORDER = ['auto', 'low', 'medium', 'high'];
+function qualityLevel() {
+  const q = state.settings.quality || 'auto';
+  return q === 'auto' ? (isTouch ? 'medium' : 'high') : q;
+}
+function applyQuality() {
+  const lvl = qualityLevel();
+  const dprCap = lvl === 'low' ? 1 : lvl === 'medium' ? 1.25 : 2;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap, isTouch ? 1.5 : 2));
+  const res = lvl === 'low' ? 512 : lvl === 'medium' ? 1024 : 2048;
+  if (key.shadow.mapSize.width !== res) {
+    key.shadow.mapSize.set(res, res);
+    if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; }
+  }
+}
+function renderQualityBtn() {
+  $('btnQuality').textContent = `🎚️ Quality: ${cap(state.settings.quality || 'auto')}${(state.settings.quality || 'auto') === 'auto' ? ` (${cap(qualityLevel())})` : ''}`;
+}
+function cap(s) { return s[0].toUpperCase() + s.slice(1); }
+$('btnQuality').addEventListener('click', () => {
+  const cur = state.settings.quality || 'auto';
+  state.settings.quality = QUALITY_ORDER[(QUALITY_ORDER.indexOf(cur) + 1) % QUALITY_ORDER.length];
+  applyQuality();
+  renderQualityBtn();
+  save();
+  toast(`🎚️ Graphics quality: <b>${cap(state.settings.quality)}</b>${state.settings.quality === 'auto' ? ` (→ ${cap(qualityLevel())})` : ''}`, 2200);
+});
+applyQuality();
+renderQualityBtn();
+
+/* save management: export / import */
+$('saveVersion').textContent = `v${saveMod.SAVE_VERSION}`;
+$('btnExportSave').addEventListener('click', async () => {
+  const json = saveMod.exportSave();
+  let copied = false;
+  try { await navigator.clipboard.writeText(json); copied = true; } catch { /* clipboard may be unavailable */ }
+  try {
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'trepio-save.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch { /* download may be blocked */ }
+  toast(copied
+    ? '💾 Save exported — <b>copied to clipboard</b> and downloaded as <i>trepio-save.json</i>'
+    : '💾 Save exported as <i>trepio-save.json</i> — keep it somewhere safe!', 4200);
+});
+$('btnImportSave').addEventListener('click', () => $('importFile').click());
+$('importFile').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const res = saveMod.importSave(text);
+    if (!res.ok) { toast(`⚠️ Import failed: ${res.error}`, 3400); return; }
+    if (!saveMod.commitImport(res.state)) { toast('⚠️ Could not write the save (storage full?)', 3400); return; }
+    toast('💾 Save imported! Reloading…', 1600);
+    setTimeout(() => location.reload(), 700);
+  } catch {
+    toast('⚠️ Could not read that file', 3000);
+  }
+});
 
 /* keyboard */
 window.addEventListener('keydown', (e) => {
@@ -1832,95 +1149,9 @@ window.addEventListener('keydown', kickstartMusic);
 /* ------------------------------------------------------------------ */
 const PLAYER_R = 0.34;
 const GRAVITY = 14;
-const _move = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
-
-function lerpAngle(a, b, t) {
-  let d = (b - a) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return a + d * t;
-}
-
-function resolveWorldCollisions(p, r) {
-  for (const b of world.boxes) {
-    if (p.x + r < b.minX || p.x - r > b.maxX || p.z + r < b.minZ || p.z - r > b.maxZ) continue;
-    const cx = Math.max(b.minX, Math.min(p.x, b.maxX));
-    const cz = Math.max(b.minZ, Math.min(p.z, b.maxZ));
-    const dx = p.x - cx, dz = p.z - cz;
-    const d2 = dx * dx + dz * dz;
-    if (d2 > 1e-6) {
-      const d = Math.sqrt(d2);
-      if (d < r) {
-        const push = (r - d) / d;
-        p.x += dx * push;
-        p.z += dz * push;
-      }
-    } else {
-      const l = p.x - b.minX + r, rr = b.maxX - p.x + r;
-      const t = p.z - b.minZ + r, bo = b.maxZ - p.z + r;
-      const m = Math.min(l, rr, t, bo);
-      if (m === l) p.x = b.minX - r;
-      else if (m === rr) p.x = b.maxX + r;
-      else if (m === t) p.z = b.minZ - r;
-      else p.z = b.maxZ + r;
-    }
-  }
-  for (const c of world.circles) {
-    const dx = p.x - c.x, dz = p.z - c.z;
-    const rr = c.r + r;
-    const d2 = dx * dx + dz * dz;
-    if (d2 < rr * rr && d2 > 1e-6) {
-      const d = Math.sqrt(d2);
-      p.x = c.x + (dx / d) * rr;
-      p.z = c.z + (dz / d) * rr;
-    }
-  }
-  const bd = Math.hypot(p.x, p.z);
-  if (bd > world.R_BOUND - 1) {
-    p.x = (p.x / bd) * (world.R_BOUND - 1);
-    p.z = (p.z / bd) * (world.R_BOUND - 1);
-  }
-}
-function resolveBoxCircle(boxes, circles, p, r) {
-  for (const b of boxes) {
-    if (p.x + r < b.minX || p.x - r > b.maxX || p.z + r < b.minZ || p.z - r > b.maxZ) continue;
-    const cx = Math.max(b.minX, Math.min(p.x, b.maxX));
-    const cz = Math.max(b.minZ, Math.min(p.z, b.maxZ));
-    const dx = p.x - cx, dz = p.z - cz;
-    const d2 = dx * dx + dz * dz;
-    if (d2 > 1e-6) {
-      const d = Math.sqrt(d2);
-      if (d < r) {
-        const push = (r - d) / d;
-        p.x += dx * push;
-        p.z += dz * push;
-      }
-    } else {
-      const l = p.x - b.minX + r, rr = b.maxX - p.x + r;
-      const t = p.z - b.minZ + r, bo = b.maxZ - p.z + r;
-      const m = Math.min(l, rr, t, bo);
-      if (m === l) p.x = b.minX - r;
-      else if (m === rr) p.x = b.maxX + r;
-      else if (m === t) p.z = b.minZ - r;
-      else p.z = b.maxZ + r;
-    }
-  }
-  for (const c of circles) {
-    const dx = p.x - c.x, dz = p.z - c.z;
-    const rr = c.r + r;
-    const d2 = dx * dx + dz * dz;
-    if (d2 < rr * rr && d2 > 1e-6) {
-      const d = Math.sqrt(d2);
-      p.x = c.x + (dx / d) * rr;
-      p.z = c.z + (dz / d) * rr;
-    }
-  }
-}
-function resolveCastleCollisions(p, r) {
-  resolveBoxCircle(world.castle.boxes, world.castle.circles, p, r);
-}
+const _move = new THREE.Vector3();
 
 function updatePlayer(dt, t) {
   const p = player.group.position;
@@ -1976,7 +1207,7 @@ function updatePlayer(dt, t) {
   }
 
   if (inCastle) resolveCastleCollisions(p, PLAYER_R);
-  else if (inHouse && activeHome) resolveBoxCircle(activeHome.interior.boxes, activeHome.interior.circles, p, PLAYER_R);
+  else if (inHouse && getActiveHome()) resolveBoxCircle(getActiveHome().interior.boxes, getActiveHome().interior.circles, p, PLAYER_R);
   else resolveWorldCollisions(p, PLAYER_R);
 
   /* spin emote */
@@ -2061,22 +1292,16 @@ function updatePlayer(dt, t) {
       world.collectGem();
       progress.addCandies(1);
       if (!progress.questStage('__gemFirst')) {
-        progress.setQuestStage('__gemFirst', 'done');
-        progress.addXP(10);
-        toast('⭐ You found the <b>Star Candy</b>! (+10 XP) It reappears with a candy each time…', 3600);
+        progress.setQuestStage('__gemFirst', 1);
+        toast('💎 The star candy glows… it will return!', 2600);
       } else {
-        toast('⭐ Star Candy! <b>+1 candy</b>', 2000);
+        toast('💎 +1 candy', 1400);
       }
-      if (effectsOn()) {
-        effects.spawnConfetti(24, gp);
-        effects.spawnHearts(3, p);
-      }
+      if (effectsOn()) effects.spawnHearts(2, p);
       updateStats();
-      save();
     }
   }
 
-  /* castle door hint */
   if (!game.doorHintShown && p.distanceTo(world.castleDoor) < 5) {
     game.doorHintShown = true;
     toast('🏰 Press <b>E</b> at the gate to enter the candy castle!', 3000);
@@ -2084,190 +1309,6 @@ function updatePlayer(dt, t) {
 
   updateQuests();
   updateTracker();
-}
-
-/* ------------------------------------------------------------------ */
-/* NPC update                                                          */
-/* ------------------------------------------------------------------ */
-const _nToPlayer = new THREE.Vector3();
-const _nDir = new THREE.Vector3();
-let npcTick = 0;
-
-function enterNpcHome(n) {
-  n.home.interior.group.add(n.doll.group);
-  n.doll.group.position.copy(n.home.npcSpot);
-  n.doll.group.position.y = 0;
-  n.doll.group.rotation.y = Math.PI + (Math.random() - 0.5);
-  n.homeState = 'home';
-  n.goingHome = false;
-  n.state = 'idle';
-  n.timer = 1;
-  n.homeTimer = 40 + Math.random() * 80;
-  n.sitting = false;
-  n.doll.setPose('stand');
-  n.lastPos.copy(n.doll.group.position);
-}
-function exitNpcHome(n) {
-  world.group.add(n.doll.group);
-  n.doll.group.position.copy(n.home.exit);
-  n.doll.group.position.y = 0;
-  n.homeState = 'out';
-  n.homeTimer = 60 + Math.random() * 140;
-  n.state = 'idle';
-  n.timer = 0.5;
-  n.sitting = false;
-  n.doll.setPose('stand');
-  n.target.set(0, 0, 26);
-  n.lastPos.copy(n.doll.group.position);
-}
-
-function updateNpc(n, dt, t) {
-  const p = n.doll.group.position;
-
-  /* ---- inside their own house ---- */
-  if (n.homeState === 'home') {
-    if (!activeHome || activeHome !== n.home) return; /* frozen while nobody watches */
-    _nToPlayer.subVectors(player.group.position, p);
-    const distToPlayer = _nToPlayer.length();
-    n.homeTimer -= dt;
-    if (n.homeTimer <= 0) { exitNpcHome(n); return; }
-
-    if (n.sitting) {
-      n.timer -= dt;
-      if (n.timer <= 0) {
-        n.sitting = false;
-        n.doll.setPose('stand');
-        n.doll.group.position.y = 0;
-        n.state = 'idle';
-        n.timer = 1;
-      }
-    } else if (distToPlayer < 2.5) {
-      n.state = 'greet';
-      n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nToPlayer.x, _nToPlayer.z), Math.min(1, dt * 6));
-      n.waveTimer -= dt;
-      if (n.waveTimer <= 0) {
-        n.doll.wave();
-        n.waveTimer = 4 + Math.random() * 4;
-        if (effectsOn() && Math.random() < 0.4) effects.spawnHearts(1, p);
-      }
-    } else if (n.state === 'idle') {
-      n.timer -= dt;
-      if (n.timer <= 0) {
-        if (Math.random() < 0.3 && n.home.interior.sits.length) {
-          const spot = n.home.interior.sits[(Math.random() * n.home.interior.sits.length) | 0];
-          n.target.set(spot.x, 0, spot.z);
-          n.sitSpot = spot;
-        } else {
-          pickInteriorTarget(n, n.home.interior.bounds);
-          n.sitSpot = null;
-        }
-        n.state = 'walk';
-      }
-    } else {
-      _nDir.subVectors(n.target, p);
-      _nDir.y = 0;
-      const d = _nDir.length();
-      if (d < 0.4) {
-        if (n.sitSpot && Math.hypot(p.x - n.sitSpot.x, p.z - n.sitSpot.z) < 0.55) {
-          n.sitting = true;
-          n.doll.setPose('sit');
-          n.doll.group.position.y = 0.12;
-          n.doll.group.rotation.y = n.sitSpot.ry;
-          n.timer = 8 + Math.random() * 12;
-        } else {
-          n.state = 'idle';
-          n.timer = 1.5 + Math.random() * 3;
-        }
-      } else {
-        _nDir.multiplyScalar((n.speed * 0.7 * dt) / d);
-        p.x += _nDir.x;
-        p.z += _nDir.z;
-        n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nDir.x, _nDir.z), Math.min(1, dt * 6));
-      }
-      resolveBoxCircle(n.home.interior.boxes, n.home.interior.circles, p, 0.3);
-    }
-    n.doll.update({ walk01: n.state === 'walk' ? 0.55 : 0, dance01: 0, beatPhase: music.beatPhase() }, dt, t);
-    return;
-  }
-
-  /* ---- out in the world ---- */
-  _nToPlayer.subVectors(player.group.position, p);
-  const distToPlayer = _nToPlayer.length();
-  npcTick++;
-
-  if (distToPlayer > 45 && (npcTick + n.tick) % 3 !== 0) return;
-
-  /* homing: head home when the timer fires */
-  if (n.home && !n.goingHome && distToPlayer > 12) {
-    n.homeTimer -= dt;
-    if (n.homeTimer <= 0) {
-      n.goingHome = true;
-      n.target.copy(n.home.door);
-      n.state = 'walk';
-      n.sitSpot = null;
-    }
-  }
-
-  if (distToPlayer < 3 && game.mode === 'world') {
-    n.state = 'greet';
-    n.goingHome = false; /* pause to greet the player */
-    n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nToPlayer.x, _nToPlayer.z), Math.min(1, dt * 6));
-    n.waveTimer -= dt;
-    if (n.waveTimer <= 0) {
-      n.doll.wave();
-      n.waveTimer = 4 + Math.random() * 4;
-      if (effectsOn() && Math.random() < 0.4) effects.spawnHearts(1, p);
-    }
-  } else if (n.goingHome) {
-    const door = n.home.door;
-    _nDir.set(door.x - p.x, 0, door.z - p.z);
-    const d = _nDir.length();
-    if (d < 0.8) {
-      enterNpcHome(n);
-      return;
-    }
-    _nDir.multiplyScalar((n.speed * 1.15 * dt) / d);
-    p.x += _nDir.x;
-    p.z += _nDir.z;
-    n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nDir.x, _nDir.z), Math.min(1, dt * 6));
-  } else if (n.state === 'idle') {
-    n.timer -= dt;
-    if (n.timer <= 0) {
-      pickNpcTarget(n);
-      n.state = 'walk';
-    }
-  } else {
-    _nDir.subVectors(n.target, p);
-    _nDir.y = 0;
-    const d = _nDir.length();
-    if (d < 0.6) {
-      n.state = 'idle';
-      n.timer = 1.5 + Math.random() * 3.5;
-    } else {
-      _nDir.multiplyScalar((n.speed * dt) / d);
-      p.x += _nDir.x;
-      p.z += _nDir.z;
-      n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nDir.x, _nDir.z), Math.min(1, dt * 6));
-    }
-  }
-
-  n.stuckTimer += dt;
-  if (n.stuckTimer > 1.6) {
-    if (p.distanceToSquared(n.lastPos) < 0.09) {
-      if (n.goingHome) n.target.copy(n.home.door);
-      else pickNpcTarget(n);
-      if (n.state === 'idle') n.timer = 0.2;
-    }
-    n.lastPos.copy(p);
-    n.stuckTimer = 0;
-  }
-
-  resolveWorldCollisions(p, 0.3);
-  const bd = Math.hypot(p.x, p.z);
-  if (bd > world.R_BOUND - 1.5) {
-    n.target.set(0, 0, 26);
-  }
-  n.doll.update({ walk01: n.state === 'walk' || n.goingHome ? 0.7 : 0, dance01: 0, beatPhase: music.beatPhase() }, dt, t);
 }
 
 /* ------------------------------------------------------------------ */
@@ -2345,7 +1386,7 @@ animate();
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDPR));
+  applyQuality();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
@@ -2374,6 +1415,7 @@ if (DEBUG) {
     interact, enterCastle, leaveCastle, openChest, raw: state,
     enterHome(id) { const h = world.homes.find((x) => x.id === id); if (h) enterHome(h); },
     leaveHome, startMini, cancelMini, setPet,
+    saveApi: saveMod,
     forceNpcHome(id, home) {
       const n = npcs.find((x) => x.ch.id === id);
       if (!n || !n.home) return false;
@@ -2382,10 +1424,10 @@ if (DEBUG) {
     },
     buy(id) { const it = SHOP.find((x) => x.id === id); if (it) buyItem(it); },
     state() {
-      const owner = activeHome ? npcs.find((x) => x.home === activeHome) : null;
+      const owner = getActiveHome() ? npcs.find((x) => x.home === getActiveHome()) : null;
       return {
         mode: game.mode,
-        home: activeHome ? activeHome.id : null,
+        home: getActiveHome() ? getActiveHome().id : null,
         ownerHome: owner ? owner.homeState : null,
         pos: player.group.position.toArray(),
         npcs: npcs.length,
@@ -2403,6 +1445,7 @@ if (DEBUG) {
         petPos: petObj ? petObj.group.position.toArray() : null,
         met: state.progress.met,
         games: state.progress.games,
+        quality: state.settings.quality || 'auto',
         gender: player.male ? 'male' : 'female',
         level: progress.level,
         xp: progress.xp,
@@ -2412,7 +1455,6 @@ if (DEBUG) {
         collected: Object.keys(state.progress.collected).length,
         quests: progress.quests,
         tracker: document.getElementById('tracker')?.textContent || '',
-        beacon: world.group.visible ? [world.group.children.find(() => false)] : null,
       };
     },
   };
