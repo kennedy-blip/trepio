@@ -37,18 +37,28 @@ function updateTrackerSelf() {
   if (ctx.quests) ctx.quests.updateTracker();
 }
 
+/* the first win of each mini-game per visit pays double (not saved —
+   a little "welcome back" that keeps the economy friendly for grinders) */
+const sessionBonus = { catch: true, race: true };
+
 function finishCatch() {
   const mini = ctx.game.mini;
   const g = ctx.state.progress.games;
   const score = mini.score;
   const first = !g.catchFirst && score >= 3;
-  const reward = first ? Math.min(20, Math.max(2, score)) : Math.min(6, Math.floor(score / 3));
+  let reward = first ? Math.min(20, Math.max(2, score)) : Math.min(8, Math.floor(score / 2));
+  let bonusTag = '';
+  if (sessionBonus.catch && score >= 3) {
+    reward = Math.min(30, reward * 2);
+    sessionBonus.catch = false;
+    bonusTag = ' · first win today ×2 🎉';
+  }
   if (score > g.catchBest) g.catchBest = score;
   if (score >= 3) g.catchFirst = true;
   cancelMini(true);
   if (reward > 0) ctx.progress.addCandies(reward);
   ctx.music.start('ambient');
-  ctx.ui.toast(`🍭 <b>Candy Catch over!</b> Score: <b>${score}</b> · best ${g.catchBest} · <b>+${reward} candies</b>${first ? ' 🎉' : ''}`, 4200);
+  ctx.ui.toast(`🍭 <b>Candy Catch over!</b> Score: <b>${score}</b> · best ${g.catchBest} · <b>+${reward} candies</b>${bonusTag}`, 4200);
   ctx.ui.updateStats();
   ctx.save();
   updateTrackerSelf();
@@ -62,13 +72,19 @@ function finishRace() {
   if (isRecord) g.raceBest = Math.round(time * 10) / 10;
   const win = time <= RACE_PAR;
   const first = win && !g.raceFirst;
-  const reward = first ? 15 : (win ? 5 : 2);
+  let reward = first ? 15 : (win ? 6 : 3);
+  let bonusTag = '';
+  if (sessionBonus.race && win) {
+    reward = Math.min(30, reward * 2);
+    sessionBonus.race = false;
+    bonusTag = ' · first win today ×2 🎉';
+  }
   if (win) g.raceFirst = true;
   cancelMini(true);
   ctx.progress.addCandies(reward);
   ctx.music.start('ambient');
   if (ctx.ui.effectsOn()) ctx.effects.spawnConfetti(30, ctx.player.group.position);
-  ctx.ui.toast(`🏁 <b>Race finished!</b> Time <b>${time.toFixed(1)}s</b>${isRecord ? ' · new best!' : ''} · <b>+${reward} candies</b>${win ? '' : ' (over par)'}`, 4200);
+  ctx.ui.toast(`🏁 <b>Race finished!</b> Time <b>${time.toFixed(1)}s</b>${isRecord ? ' · new best!' : ''} · <b>+${reward} candies</b>${win ? '' : ' (over par)'}${bonusTag}`, 4200);
   ctx.ui.updateStats();
   ctx.save();
   updateTrackerSelf();

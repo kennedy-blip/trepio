@@ -18,8 +18,8 @@ offline. **Live at <https://trepio.vercel.app>**.
 | 👑 **The royal family** | Six royals in the palace — King Jamoh, Queen Dama, Prince Ken, Princess Fay, Duke Whitney, Chef Bleso — each with a quest line and a warm word. |
 | 📜 **12 quests** | From *Sweet Tooth* (collect candies) and *Royal Visit* to finding the Golden Gummy Bear and helping the royals — tracked in your quest journal. |
 | 🏡 **7 village homes** | Every villager has a cottage. Knock on the door, come inside, sit on the furniture — the owner may be home. |
-| 🐾 **3 pets** | Gummy Cat, Coco Bunny and Sugar Pup from the candy shop follow you around the kingdom. |
-| 🕹️ **2 arcade mini-games** | **Candy Catch** (catch falling candies) and **Gummy Rush** (ring race) — best scores are saved. |
+| 🐾 **5 pets** | Gummy Cat, Coco Bunny, Sugar Pup — plus the premium Gummy Bear (🍬 60) and Candy Unicorn (🍬 100) — follow you around the kingdom. |
+| 🕹️ **2 arcade mini-games** | **Candy Catch** (catch falling candies) and **Gummy Rush** (ring race) — best scores are saved, and the first win of each game per visit pays **double candies**. |
 | 👗 **Wardrobe** | Hairstyles, outfits and accessories for every character, unlocked as you level up. Boys and girls get their own collections. |
 | 💾 **Save system** | Versioned saves in `localStorage` with **Export / Import** — carry your kingdom between devices or back it up. |
 
@@ -31,8 +31,10 @@ offline. **Live at <https://trepio.vercel.app>**.
 and journal.
 
 ⚙️ **Graphics quality** (Settings): `Auto / Low / Medium / High` — pixel-ratio
-and shadow resolution scale down on low-power phones. Auto picks Medium on
-touch devices, High on desktop.
+and shadow resolution scale down on low-power phones. **Auto is adaptive**: it
+picks Medium on touch devices and High on desktop, then watches the frame rate
+and steps the tier down (or back up) if the device struggles — so weak phones
+stay smooth automatically.
 
 ## 💾 Saves & data
 
@@ -64,7 +66,9 @@ A headless-browser regression suite covers the game end to end — boot, candy
 persistence over reload, shop + balance, pets, all 12 quests, palace and all
 7 homes (with owner visits), both mini-games with persisted records, save
 export/import round-trips (plus garbage rejection and v2→v3 migration),
-graphics-quality settings, and a mobile (Pixel 5) emulation pass:
+graphics-quality settings (including the adaptive Auto tier), the economy
+(new pets, prices, daily-bonus rewards), and a mobile (Pixel 5) emulation
+pass:
 
 ```bash
 npm install      # brings a self-contained headless Chromium
@@ -87,6 +91,7 @@ via an import map:
 | `js/inventory.js` | Candy shop & pets |
 | `js/minigames.js` | Candy Catch & Gummy Rush |
 | `js/save.js` | Versioned save/load, export/import, migration |
+| `js/quality.js` | Graphics quality presets + adaptive Auto tier |
 | `js/ctx.js` | Late-bound shared context (module wiring) |
 | `js/collide.js`, `js/input.js`, `js/pets.js`, `js/audio.js`, `js/effects.js`, `js/progress.js` | Physics, keyboard/touch, pet AI, sound, sparkle effects, XP/levels |
 

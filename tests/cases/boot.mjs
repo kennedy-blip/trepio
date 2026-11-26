@@ -10,10 +10,10 @@ export default async ({ go, page, T }) => {
   const rows = await page.evaluate(() => document.querySelectorAll('.quest-row').length);
   if (rows !== 13) throw new Error('journal rows: ' + rows);
   await page.click('#btnCloseJournal');
-  /* shop: 7 cosmetics + 3 pets */
+  /* shop: 7 cosmetics + 5 pets */
   await page.click('#btnShop2');
   await page.waitForTimeout(300);
   const shopRows = await page.evaluate(() => document.querySelectorAll('.shop-row').length);
-  if (shopRows !== 10) throw new Error('shop rows: ' + shopRows);
+  if (shopRows !== 12) throw new Error('shop rows: ' + shopRows);
   await page.click('#btnCloseShop');
 };

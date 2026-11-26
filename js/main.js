@@ -23,6 +23,7 @@ import { startMini, cancelMini, updateMini } from './minigames.js';
 import { npcs, royals, rebuildNpcs, buildRoyals, updateNpc, updateRoyal, nearestNpc, nearestRoyal,
          talkToNpc, closeDialogue, dialogueOpen, enterNpcHome, exitNpcHome } from './npc.js';
 import { enterHome, leaveHome, nearestHomeDoor, hideAllInteriors, playerSit, getActiveHome } from './homes.js';
+import { initQuality } from './quality.js';
 import { lerpAngle, resolveWorldCollisions, resolveCastleCollisions, resolveBoxCircle } from './collide.js';
 
 /* ------------------------------------------------------------------ */
@@ -1057,36 +1058,8 @@ function setShadows(on) {
   scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
 }
 
-/* graphics quality (mobile-friendly presets) */
-const QUALITY_ORDER = ['auto', 'low', 'medium', 'high'];
-function qualityLevel() {
-  const q = state.settings.quality || 'auto';
-  return q === 'auto' ? (isTouch ? 'medium' : 'high') : q;
-}
-function applyQuality() {
-  const lvl = qualityLevel();
-  const dprCap = lvl === 'low' ? 1 : lvl === 'medium' ? 1.25 : 2;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, dprCap, isTouch ? 1.5 : 2));
-  const res = lvl === 'low' ? 512 : lvl === 'medium' ? 1024 : 2048;
-  if (key.shadow.mapSize.width !== res) {
-    key.shadow.mapSize.set(res, res);
-    if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; }
-  }
-}
-function renderQualityBtn() {
-  $('btnQuality').textContent = `🎚️ Quality: ${cap(state.settings.quality || 'auto')}${(state.settings.quality || 'auto') === 'auto' ? ` (${cap(qualityLevel())})` : ''}`;
-}
-function cap(s) { return s[0].toUpperCase() + s.slice(1); }
-$('btnQuality').addEventListener('click', () => {
-  const cur = state.settings.quality || 'auto';
-  state.settings.quality = QUALITY_ORDER[(QUALITY_ORDER.indexOf(cur) + 1) % QUALITY_ORDER.length];
-  applyQuality();
-  renderQualityBtn();
-  save();
-  toast(`🎚️ Graphics quality: <b>${cap(state.settings.quality)}</b>${state.settings.quality === 'auto' ? ` (→ ${cap(qualityLevel())})` : ''}`, 2200);
-});
-applyQuality();
-renderQualityBtn();
+/* graphics quality: presets + adaptive Auto (module) */
+const quality = initQuality({ renderer, key, state, isTouch, save, toast });
 
 /* save management: export / import */
 $('saveVersion').textContent = `v${saveMod.SAVE_VERSION}`;
@@ -1378,6 +1351,7 @@ function animate() {
   key.target.updateMatrixWorld();
 
   effects.update(dt, t);
+  quality.tick(dt);
   renderer.render(scene, camera);
 }
 animate();
@@ -1386,7 +1360,6 @@ animate();
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  applyQuality();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
@@ -1413,6 +1386,8 @@ if (DEBUG) {
     game, world, player, npcs, royals, music, progress, quests: QUESTS,
     teleport(x, z) { player.group.position.set(x, 0, z); },
     interact, enterCastle, leaveCastle, openChest, raw: state,
+    simulateFps: (x) => quality.simulateFps(x),
+    qualityTick: (s) => quality.debugAdvance(s),
     enterHome(id) { const h = world.homes.find((x) => x.id === id); if (h) enterHome(h); },
     leaveHome, startMini, cancelMini, setPet,
     saveApi: saveMod,
@@ -1446,6 +1421,7 @@ if (DEBUG) {
         met: state.progress.met,
         games: state.progress.games,
         quality: state.settings.quality || 'auto',
+        qualityTier: quality.level(),
         gender: player.male ? 'male' : 'female',
         level: progress.level,
         xp: progress.xp,
