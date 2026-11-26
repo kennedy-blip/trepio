@@ -3,8 +3,19 @@
 Dress up your doll, then step into a **sweet fantasy world**: a candy-cane maze,
 lollipop forest, chocolate river under a rainbow, gumdrop village, gummy bears,
 cotton-candy trees, whipped-cream hills, a candy castle — and butterflies
-fluttering everywhere. Find the **Star Candy** hidden at the maze center.
-The other dolls live in the world as NPCs who wander around and wave hello.
+fluttering everywhere. Collect candies, level up, complete quests and unlock
+magical outfits. The other dolls live in the world as NPCs you can talk to.
+
+## 🎯 Gameplay
+
+- **Quests** — collect candies, visit the castle, cross the rainbow river,
+  find the lost golden gummy bear, help a friend get home
+- **XP & levels** — candies and quests give XP; levels unlock wardrobe items
+- **Unlockables** — 🌈 Rainbow Gown (Lv 2), ✨ Star Suit (Lv 2),
+  🦋 butterfly Wings (Lv 3), 🌟 Halo (Lv 4)
+- **28 collectible candies** scattered across the world (some hidden in the maze)
+- **NPC dialogue** — walk up to any doll and press E to chat
+- Progress, outfits and settings are saved in `localStorage`
 
 ## 🧸 Characters
 
@@ -33,9 +44,10 @@ wander the world as NPCs.
 | Move | WASD / arrows (or touch joystick) |
 | Run | Shift |
 | Jump | Space / 🤸 button |
+| Talk to NPCs | E / 💬 button |
 | Look around | drag · scroll / pinch to zoom |
-| Wave / Dance / Spin | E / R / F or buttons |
-| Music | M |
+| Wave / Dance / Spin | Q / R / F or buttons |
+| Music / Settings | M / ⚙️ |
 | Back to studio | H / 🏠 |
 
 ## ▶️ Run it
@@ -59,13 +71,16 @@ Deploys to Vercel with the **Vite** preset. Live: https://trepio.vercel.app
 
 - three.js r180 — the dolls are 100% procedural (spheres, capsules, lathes)
 - Male & female doll bodies from one factory (trousers attach to leg rigs)
+- Quest/XP/level progression module with level-gated unlockables
 - Procedural maze (DFS backtracker, verified always solvable) with AABB collision
 - Third-person follow camera, jump physics, circle/box collision resolution
 - 24 animated butterflies with orbiting free-flight paths & flapping wings
 - Candy castle, rainbow, gumdrop village, gummy bears, cream hills, cookie paths
 - WebAudio beatbox with two moods — ambient world music & dance beat
-- NPCs with simple wander/greet AI (all non-player dolls populate the world)
-- Game features (objectives, collectibles, scoring) planned after review
+- NPCs with wander/greet AI, stuck detection & obstacle avoidance, LOD updates,
+  and allocation-free per-frame math (no GC pressure)
+- Settings menu (music / shadows / effects), loading screen, reduced-motion
+  support, zoom-friendly viewport, debug hook dev-gated (`?debug`)
 
 ## 📁 Files
 

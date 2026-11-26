@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Trepio Candy World</title>
-<meta name="description" content="Dress up your doll and explore an open candy world — maze, lollipop forest, chocolate river and ice cream mountains.">
+<meta name="description" content="Dress up your doll, explore an open candy world, complete quests, level up and unlock magical outfits.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍬</text></svg>">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -18,6 +18,14 @@
   </div>
 </div>
 
+<!-- ============ loading screen ============ -->
+<div id="loading" aria-hidden="true">
+  <div class="loader">
+    <div class="loader-candy">🍬</div>
+    <p>Loading Candy World…</p>
+  </div>
+</div>
+
 <!-- ============ title / character select ============ -->
 <div id="title">
   <div class="titlecard">
@@ -27,16 +35,21 @@
     <div id="charInfo"></div>
     <div class="btnrow">
       <button id="btnCustomize" class="action">✨ Customize</button>
+      <button id="btnSettings" class="action">⚙️</button>
       <button id="btnEnter" class="action primary">▶ Enter the World</button>
     </div>
-    <p class="hint">WASD / arrows to move · Space to jump · drag to look · E wave · R dance</p>
+    <p class="hint">WASD / arrows to move · Space jump · drag to look · E talk · R dance</p>
   </div>
 </div>
 
 <!-- ============ world HUD ============ -->
 <div id="hud" class="hidden">
   <div id="hudName"></div>
+  <div id="tracker"></div>
 </div>
+
+<!-- ============ stats (XP / level / candy) ============ -->
+<div id="stats" class="hidden"></div>
 
 <!-- ============ dress-up panel ============ -->
 <nav id="panel" aria-label="Dress-up controls"></nav>
@@ -44,18 +57,35 @@
 <!-- ============ world action bar ============ -->
 <div id="actionbar" class="hidden">
   <button id="btnDance" class="action primary">💃 Dance</button>
+  <button id="btnTalk" class="action">💬 Talk</button>
   <button id="btnWave" class="action">👋 Wave</button>
   <button id="btnSpin" class="action">🌀 Spin</button>
   <button id="btnJump" class="action">🤸 Jump</button>
   <button id="btnMute" class="action icon" title="Music on/off" aria-label="Music on/off">🔊</button>
+  <button id="btnSettings2" class="action icon" title="Settings" aria-label="Settings">⚙️</button>
   <button id="btnHome" class="action icon" title="Back to studio" aria-label="Back to studio">🏠</button>
 </div>
 
 <!-- ============ touch joystick ============ -->
 <div id="joy"><div id="joyKnob"></div></div>
 
+<!-- ============ NPC dialogue ============ -->
+<div id="dialogue" aria-live="polite"></div>
+
 <!-- ============ toast ============ -->
 <div id="toast"></div>
+
+<!-- ============ settings ============ -->
+<div id="settings" class="hidden">
+  <h3>⚙️ Settings</h3>
+  <label class="opt"><input type="checkbox" id="optMusic" checked> 🎵 Music</label>
+  <label class="opt"><input type="checkbox" id="optShadows" checked> 🌗 Shadows</label>
+  <label class="opt"><input type="checkbox" id="optEffects" checked> ✨ Sparkle effects</label>
+  <div class="settings-actions">
+    <button id="btnReset" class="danger">🗑 Reset progress</button>
+    <button id="btnCloseSettings" class="action">Done</button>
+  </div>
+</div>
 
 <script type="importmap">
 {
