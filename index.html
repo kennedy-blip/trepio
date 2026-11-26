@@ -104,10 +104,19 @@
   <label class="opt"><input type="checkbox" id="optMusic" checked> 🎵 Music</label>
   <label class="opt"><input type="checkbox" id="optShadows" checked> 🌗 Shadows</label>
   <label class="opt"><input type="checkbox" id="optEffects" checked> ✨ Sparkle effects</label>
+  <div class="opt"><button id="btnQuality" class="action quality-btn">🎚️ Quality: Auto</button></div>
+  <div class="settings-row save-mgmt">
+    <div class="save-title">💾 Save management <small id="saveVersion"></small></div>
+    <div class="settings-actions">
+      <button id="btnExportSave" class="action">⬇️ Export</button>
+      <button id="btnImportSave" class="action">⬆️ Import</button>
+    </div>
+  </div>
   <div class="settings-actions">
     <button id="btnReset" class="danger">🗑 Reset progress</button>
     <button id="btnCloseSettings" class="action">Done</button>
   </div>
+  <input type="file" id="importFile" accept="application/json,.json" hidden>
 </div>
 
 <script type="importmap">

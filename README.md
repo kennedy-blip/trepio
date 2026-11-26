@@ -1,97 +1,102 @@
-# 🍬 Trepio Candy World
+# 🍬 Trepio — The Candy Kingdom
 
-Dress up your doll, then step into a **sweet fantasy world**: a candy-cane maze,
-lollipop forest, chocolate river under a rainbow, gumdrop village, gummy bears,
-cotton-candy trees, whipped-cream hills, a candy castle — and butterflies
-fluttering everywhere. Collect candies, level up, complete quests and unlock
-magical outfits. The other dolls live in the world as NPCs you can talk to.
+A handcrafted 3D **candy-fantasy kingdom** that runs entirely in your browser —
+no servers, no accounts, no downloads. Dress up your doll, step outside and
+explore a living little world: a candy-cane maze, lollipop forest, rainbow
+river, gumdrop village and a grand palace. Complete quests, meet the royal
+family, keep pets, and play arcade mini-games. Progress saves locally on your
+device and can be exported as a file.
 
-## 🎯 Gameplay
+Built with [three.js](https://threejs.org) — a single static page, playable
+offline. **Live at <https://trepio.vercel.app>**.
 
-- **Quests** — collect candies, visit the castle, cross the rainbow river,
-  find the lost golden gummy bear, help a friend get home
-- **XP & levels** — candies and quests give XP; levels unlock wardrobe items
-- **Unlockables** — 🌈 Rainbow Gown (Lv 2), ✨ Star Suit (Lv 2),
-  🦋 butterfly Wings (Lv 3), 🌟 Halo (Lv 4)
-- **28 collectible candies** scattered across the world (some hidden in the maze)
-- **NPC dialogue** — walk up to any doll and press E to chat
-- Progress, outfits and settings are saved in `localStorage`
+## 🎯 What's in the game
 
-## 🧸 Characters
-
-Eight dolls — girls and boys — each with different characteristics:
-
-| Doll | Title | Speed | Jump |
-|---|---|---|---|
-| 👑 Trixie | Bubblegum Princess | 5.6 | 4.6 |
-| 🍫 Momo | Choco Scout | 4.9 | 5.3 |
-| 🌿 Zuri | Mint Ranger | 6.2 | 4.2 |
-| 🫐 Lulu | Berry Dreamer | 5.0 | 4.7 |
-| 💫 Kiki | Vanilla Comet | 6.5 | 5.6 |
-| 🤴 Theo | Cocoa Prince | 5.4 | 4.8 |
-| 🍀 Amani | Mint Explorer | 5.1 | 5.2 |
-| ⚡ Dex | Lemon Bolt | 6.4 | 5.5 |
-
-Every doll is fully customizable — hair, outfit (skirts for the girls,
-trousers for the boys), colors, shoes and accessories — and looks are saved
-per character in `localStorage`. When you play one doll, the other seven
-wander the world as NPCs.
+| | |
+|---|---|
+| 🧸 **8 characters** | Trixie, Momo, Zuri, Lulu, Kiki, Theo, Amani, Dex — each with their own speed, jump and personality. Seven of them live in the world as villagers you can chat with. |
+| 👑 **The royal family** | Six royals in the palace — King Jamoh, Queen Dama, Prince Ken, Princess Fay, Duke Whitney, Chef Bleso — each with a quest line and a warm word. |
+| 📜 **12 quests** | From *Sweet Tooth* (collect candies) and *Royal Visit* to finding the Golden Gummy Bear and helping the royals — tracked in your quest journal. |
+| 🏡 **7 village homes** | Every villager has a cottage. Knock on the door, come inside, sit on the furniture — the owner may be home. |
+| 🐾 **3 pets** | Gummy Cat, Coco Bunny and Sugar Pup from the candy shop follow you around the kingdom. |
+| 🕹️ **2 arcade mini-games** | **Candy Catch** (catch falling candies) and **Gummy Rush** (ring race) — best scores are saved. |
+| 👗 **Wardrobe** | Hairstyles, outfits and accessories for every character, unlocked as you level up. Boys and girls get their own collections. |
+| 💾 **Save system** | Versioned saves in `localStorage` with **Export / Import** — carry your kingdom between devices or back it up. |
 
 ## 🎮 Controls
 
-| Action | Input |
-|---|---|
-| Move | WASD / arrows (or touch joystick) |
-| Run | Shift |
-| Jump | Space / 🤸 button |
-| Talk to NPCs | E / 💬 button |
-| Look around | drag · scroll / pinch to zoom |
-| Wave / Dance / Spin | Q / R / F or buttons |
-| Music / Settings | M / ⚙️ |
-| Back to studio | H / 🏠 |
+**Desktop** — WASD / arrows to move, mouse to look, `Space` to jump,
+`E` to interact (talk, doors, arcades, chairs), `Esc` to close panels.
+**Mobile** — touch joystick + look-drag; on-screen buttons for jump, talk
+and journal.
 
-## ▶️ Run it
+⚙️ **Graphics quality** (Settings): `Auto / Low / Medium / High` — pixel-ratio
+and shadow resolution scale down on low-power phones. Auto picks Medium on
+touch devices, High on desktop.
 
-Zero-config — a plain static server works (everything is vendored):
+## 💾 Saves & data
+
+Everything lives in your browser's `localStorage` (key `trepio-doll-v2`, save
+format v3). **Settings → Export Save** copies a `trepio-save.json` file to your
+downloads and clipboard; **Import Save** restores it. Old save formats are
+migrated automatically on load. No accounts, no tracking, no purchases — ever.
+
+## 🚀 Running it
+
+No build step needed — it's a plain static site:
 
 ```bash
-python3 -m http.server 8000 --bind 0.0.0.0   # or: npm start
+npm start        # serve on :8000 (python http.server)
+# or: npx serve .  /  any static file server
 ```
 
-## 🚀 Build & deploy
+Optional bundling with Vite:
 
 ```bash
 npm install
-npm run build     # vite build → dist/
+npm run build    # → dist/
+npm run preview  # serve the build
 ```
 
-Deploys to Vercel with the **Vite** preset. Live: https://trepio.vercel.app
+## ✅ Tests
 
-## 🛠️ Tech
+A headless-browser regression suite covers the game end to end — boot, candy
+persistence over reload, shop + balance, pets, all 12 quests, palace and all
+7 homes (with owner visits), both mini-games with persisted records, save
+export/import round-trips (plus garbage rejection and v2→v3 migration),
+graphics-quality settings, and a mobile (Pixel 5) emulation pass:
 
-- three.js r180 — the dolls are 100% procedural (spheres, capsules, lathes)
-- Male & female doll bodies from one factory (trousers attach to leg rigs)
-- Quest/XP/level progression module with level-gated unlockables
-- Procedural maze (DFS backtracker, verified always solvable) with AABB collision
-- Third-person follow camera, jump physics, circle/box collision resolution
-- 24 animated butterflies with orbiting free-flight paths & flapping wings
-- Candy castle, rainbow, gumdrop village, gummy bears, cream hills, cookie paths
-- WebAudio beatbox with two moods — ambient world music & dance beat
-- NPCs with wander/greet AI, stuck detection & obstacle avoidance, LOD updates,
-  and allocation-free per-frame math (no GC pressure)
-- Settings menu (music / shadows / effects), loading screen, reduced-motion
-  support, zoom-friendly viewport, debug hook dev-gated (`?debug`)
-
-## 📁 Files
-
+```bash
+npm install      # brings a self-contained headless Chromium
+npm test
 ```
-index.html      — page shell + import map
-styles.css      — UI (title screen, HUD, joystick, wardrobe panel)
-js/doll.js      — doll factory + idle/walk/dance/wave animation
-js/world.js     — candy world: maze, props, colliders, animated scenery
-js/input.js     — keyboard, touch joystick, camera drag/pinch
-js/audio.js     — WebAudio beatbox (ambient / dance)
-js/effects.js   — hearts & confetti particles
-js/main.js      — modes, characters, movement, camera, NPCs, UI
-vendor/         — three.js (for the no-build static mode)
-```
+
+## 🗂 Code layout
+
+Plain ES modules (`js/`), no framework, no bundler required — three.js loads
+via an import map:
+
+| Module | Role |
+|---|---|
+| `js/main.js` | Composition root — wires every module, HUD, settings, boot |
+| `js/world.js` | Terrain, maze, river, village, palace, arcades, collectibles |
+| `js/doll.js` | Procedural low-poly dolls, poses, outfits |
+| `js/npc.js` | Villagers & royals: schedules, homing, dialogue |
+| `js/homes.js` | Cottage interiors, entering/leaving, sitting |
+| `js/quests.js` | The 12 quests + journal |
+| `js/inventory.js` | Candy shop & pets |
+| `js/minigames.js` | Candy Catch & Gummy Rush |
+| `js/save.js` | Versioned save/load, export/import, migration |
+| `js/ctx.js` | Late-bound shared context (module wiring) |
+| `js/collide.js`, `js/input.js`, `js/pets.js`, `js/audio.js`, `js/effects.js`, `js/progress.js` | Physics, keyboard/touch, pet AI, sound, sparkle effects, XP/levels |
+
+## ☁️ Deploy
+
+Any static host works. This repo deploys on push to `main` via Vercel
+(static build, no framework preset).
+
+## 🗺 Roadmap
+
+- **3.0** — art overhaul: *The Living Fantasy Kingdom* look, stylized 3D
+  realism, candy accents (not candy-everything), richer lighting.
+- Later — islands, achievements, fashion shows, seasonal events.
