@@ -10,6 +10,10 @@ export const PETS = [
     desc: 'A soft chocolate bunny with a sweet tooth.' },
   { id: 'sugarpup', icon: '🐶', name: 'Sugar Pup', price: 40, color: '#63b8f5', ear: 'floppy',
     desc: 'A blueberry sugar puppy — endlessly loyal.' },
+  { id: 'gumbear', icon: '🐻', name: 'Gummy Bear', price: 60, color: '#ff5470', ear: 'round',
+    desc: 'A squishy ruby gummy bear — hugs included.' },
+  { id: 'unicorn', icon: '🦄', name: 'Candy Unicorn', price: 100, color: '#fdeef7', ear: 'point', horn: true,
+    desc: 'A tiny pastel unicorn with a swirly candy horn.' },
 ];
 
 const lerp = THREE.MathUtils.lerp;
@@ -51,7 +55,14 @@ export function createPet(kindId) {
 
   /* ears per kind */
   const ears = [];
-  if (def.ear === 'point') {
+  if (def.ear === 'round') {
+    for (const s of [-1, 1]) {
+      const e = mk(new THREE.SphereGeometry(0.055, 12, 10), bodyMat, s * 0.075, 0.10, 0);
+      e.scale.set(1, 1, 0.55);
+      head.add(e);
+      ears.push(e);
+    }
+  } else if (def.ear === 'point') {
     for (const s of [-1, 1]) {
       const e = mk(new THREE.ConeGeometry(0.045, 0.12, 8), bodyMat, s * 0.075, 0.115, 0);
       e.rotation.z = s * -0.3;
@@ -75,6 +86,22 @@ export function createPet(kindId) {
       head.add(e);
       ears.push(e);
     }
+  }
+
+  /* unicorn extras: golden candy horn + striped mane */
+  if (def.horn) {
+    const goldMat = new THREE.MeshStandardMaterial({ color: '#ffd45e', roughness: 0.25, metalness: 0.5 });
+    const horn = mk(new THREE.ConeGeometry(0.035, 0.16, 10), goldMat, 0, 0.16, -0.01);
+    horn.rotation.x = -0.22;
+    head.add(horn);
+    const maneCols = ['#f45d8e', '#ffd45e', '#63b8f5'];
+    maneCols.forEach((c, i) => {
+      const m = mk(new THREE.SphereGeometry(0.045, 10, 8),
+        new THREE.MeshStandardMaterial({ color: c, roughness: 0.45 }),
+        0, 0.34 - i * 0.09, -0.07 - i * 0.018);
+      m.scale.set(0.9, 0.65, 0.9);
+      group.add(m);
+    });
   }
 
   /* tail */
