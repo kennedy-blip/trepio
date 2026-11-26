@@ -626,6 +626,10 @@ export function createDoll(cfg) {
     waveT: 0, boingT: 0,
     wave() { api.waveT = 1; },
     boing() { api.boingT = 1; },
+    /* pose: 'stand' (default) or 'sit' — used for chairs, thrones, sofas */
+    _pose: 'stand',
+    setPose(pose) { api._pose = pose === 'sit' ? 'sit' : 'stand'; },
+    sitting() { return api._pose === 'sit'; },
     dispose() {
       group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
       if (waist) waist.traverse?.((o) => { if (o.geometry) o.geometry.dispose(); });
@@ -674,10 +678,18 @@ export function createDoll(cfg) {
 
       /* legs */
       const step = Math.sin(phase * Math.PI * 2);
-      legL.hip.rotation.x = swing * 0.62 * w + step * 0.30 * b + Math.sin(t * 1.5) * 0.02 * (1 - energy);
-      legR2.hip.rotation.x = -swing * 0.62 * w - step * 0.30 * b + Math.sin(t * 1.5 + 2) * 0.02 * (1 - energy);
-      legL.hip.rotation.z = -0.07 * b;
-      legR2.hip.rotation.z = 0.07 * b;
+      if (api._pose === 'sit') {
+        /* seated: legs bent forward, small idle sway */
+        legL.hip.rotation.x = lerp(legL.hip.rotation.x, -1.42 + Math.sin(t * 1.2) * 0.02, Math.min(1, dt * 7));
+        legR2.hip.rotation.x = lerp(legR2.hip.rotation.x, -1.34 + Math.sin(t * 1.2 + 1) * 0.02, Math.min(1, dt * 7));
+        legL.hip.rotation.z = 0;
+        legR2.hip.rotation.z = 0;
+      } else {
+        legL.hip.rotation.x = swing * 0.62 * w + step * 0.30 * b + Math.sin(t * 1.5) * 0.02 * (1 - energy);
+        legR2.hip.rotation.x = -swing * 0.62 * w - step * 0.30 * b + Math.sin(t * 1.5 + 2) * 0.02 * (1 - energy);
+        legL.hip.rotation.z = -0.07 * b;
+        legR2.hip.rotation.z = 0.07 * b;
+      }
 
       /* skirt sway (female) */
       if (skirtGroup) {

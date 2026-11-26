@@ -12,6 +12,7 @@ import { createEffects } from './effects.js';
 import { Beatbox } from './audio.js';
 import { createInput } from './input.js';
 import { createProgress, LEVEL_XP } from './progress.js';
+import { createPet, PETS } from './pets.js';
 
 /* ------------------------------------------------------------------ */
 /* Characters                                                          */
@@ -100,6 +101,70 @@ const CHARACTERS = [
       shoes: 'flats', shoeColor: '#d9a441',
       accessories: { crown: false, bow: false, glasses: false } },
   },
+  /* ---- the royal family (live in the castle, not player-selectable) ---- */
+  {
+    id: 'jamoh', emoji: '👑', name: 'Jamoh', title: 'King of Candy World', gender: 'male', royal: true,
+    blurb: 'Wise and booming — ruler of the candy realm.',
+    speed: 4.2, jump: 3.8,
+    quest: { id: 'royalDecree', offer: 'By royal decree! My family has gathered in this palace — meet the Queen, my son Ken, and the three princesses. Earn the crown\'s trust!', active: 'You have met {N} of my 5 family members. They are all inside the palace.', done: 'Splendid! You know my whole family now. You are truly a friend of the crown.' },
+    lines: ['The realm is sweeter than ever this season.', 'My throne? Comfortable. My duties? Endless.', 'A ruler is only as sweet as his kingdom.'],
+    cfg: { hair: 'quiff', hairColor: '#c9c2b8', skin: '#8d5524', eyes: '#5a3420',
+      outfit: 'mprince', top: '#ffd45e', skirt: '#8a2f4f',
+      shoes: 'boots', shoeColor: '#33304a',
+      accessories: { crown: true, bow: false, glasses: false } },
+  },
+  {
+    id: 'dama', emoji: '💐', name: 'Dama', title: 'Queen of Candy World', gender: 'female', royal: true,
+    blurb: 'Warm and watchful — the heart of the palace.',
+    speed: 4.4, jump: 3.9,
+    quest: { id: 'queensGame', offer: 'Deary, the Candy Catch arcade in the village delights me so. Score 10 or better and I shall reward you handsomely!', active: 'The candy-catching machine by the village — 10 catches, that is all I ask. Your best so far: {N}.', done: 'Oh, marvellous reflexes! You have made the Queen very proud.' },
+    lines: ['The princesses tire me out, but I would not trade them for all the gumdrops.', 'Jamoh snores like a boiling kettle.', 'Did you eat today? The cooks worry.'],
+    cfg: { hair: 'long', hairColor: '#d9a441', skin: '#b5714f', eyes: '#5a3420',
+      outfit: 'gown', top: '#f2b8d0', skirt: '#d96a9c',
+      shoes: 'flats', shoeColor: '#d9a441',
+      accessories: { crown: true, bow: false, glasses: false, necklace: true, earrings: true } },
+  },
+  {
+    id: 'ken', emoji: '🤴', name: 'Ken', title: 'Crown Prince', gender: 'male', royal: true,
+    blurb: 'The oldest brother — brave, competitive, always training.',
+    speed: 6.0, jump: 5.0,
+    quest: { id: 'ringChampion', offer: 'The Gummy Rush race — six golden rings across the realm. Beat the par time and you will have my respect. And candies.', active: 'Run the Gummy Rush at the blue kiosk. Par is {PAR} seconds — your best: {N}.', done: 'A true champion! Perhaps one day you will race me for the crown.' },
+    lines: ['I train every morning. Sword, sprint, sweets.', 'Bleso hid my boots again. Little gremlin.', 'Father says I will make a fine king. I say: obviously.'],
+    cfg: { hair: 'quiff', hairColor: '#3a2a1e', skin: '#8d5524', eyes: '#2f6d8f',
+      outfit: 'mprince', top: '#63b8f5', skirt: '#33304a',
+      shoes: 'boots', shoeColor: '#33304a',
+      accessories: { crown: true, bow: false, glasses: false } },
+  },
+  {
+    id: 'fay', emoji: '🌸', name: 'Fay', title: 'Princess of Blossoms', gender: 'female', royal: true,
+    blurb: 'The eldest princess — bubbly, glittery, always at her vanity.',
+    speed: 5.2, jump: 4.4,
+    lines: ['Do you like my bow? I made it myself!', 'The fountain in the west wing is the best spot for thinking.', 'Whitney reads TOO much. Books, books, books.'],
+    cfg: { hair: 'buns', hairColor: '#ff8fb7', skin: '#f9ddc4', eyes: '#8a5a3c',
+      outfit: 'party', top: '#ffb3cd', skirt: '#f45d8e',
+      shoes: 'flats', shoeColor: '#ff8fb7',
+      accessories: { crown: true, bow: true, glasses: false, necklace: false, earrings: true } },
+  },
+  {
+    id: 'whitney', emoji: '📚', name: 'Whitney', title: 'Princess of Stories', gender: 'female', royal: true,
+    blurb: 'The bookish princess — quiet, clever, always near a shelf.',
+    speed: 4.8, jump: 4.2,
+    lines: ['Did you know the maze regrows its walls every night? It is in my book.', 'Shhh… I am at the good part.', 'The royal library has two hundred books. I have read them twice.'],
+    cfg: { hair: 'ponytail', hairColor: '#4a3b2a', skin: '#dda273', eyes: '#5a3420',
+      outfit: 'coord', top: '#b57de0', skirt: '#8f6fd3',
+      shoes: 'boots', shoeColor: '#8f6fd3',
+      accessories: { crown: true, bow: false, glasses: true, necklace: false, earrings: false } },
+  },
+  {
+    id: 'bleso', emoji: '🍬', name: 'Bleso', title: 'Littlest Princess', gender: 'female', royal: true,
+    blurb: 'The youngest — a tiny mischief-maker with sticky fingers.',
+    speed: 5.8, jump: 4.9,
+    lines: ['I put a frog in Ken\'s boot. Hehe.', 'The royal vault? I know where the key is. But I am not telling!', 'Race you to the fountain! Last one there does the dishes!'],
+    cfg: { hair: 'bob', hairColor: '#1a1410', skin: '#b5714f', eyes: '#3f7d4e',
+      outfit: 'party', top: '#ffd45e', skirt: '#a7d97a',
+      shoes: 'flats', shoeColor: '#ff8fb7',
+      accessories: { crown: true, bow: true, glasses: false, necklace: false, earrings: false } },
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -119,6 +184,9 @@ function loadState() {
       s.spent = s.spent || 0;
       s.progress = s.progress || { xp: 0, candies: 0, quests: {} };
       s.progress.collected = s.progress.collected || {};
+      s.progress.met = s.progress.met || {};
+      s.progress.games = { catchBest: 0, raceBest: null, catchFirst: false, raceFirst: false, ...(s.progress.games || {}) };
+      s.settings.pet = s.settings.pet || null;
       return s;
     }
   } catch { /* ignore */ }
@@ -126,10 +194,10 @@ function loadState() {
     character: 'trixie',
     cfgs: {},
     mode: 'studio',
-    progress: { xp: 0, candies: 0, quests: {}, collected: {} },
+    progress: { xp: 0, candies: 0, quests: {}, collected: {}, met: {}, games: { catchBest: 0, raceBest: null, catchFirst: false, raceFirst: false } },
     purchases: {},
     spent: 0,
-    settings: { music: true, shadows: true, effects: !reducedMotion, trail: true },
+    settings: { music: true, shadows: true, effects: !reducedMotion, trail: true, pet: null },
   };
 }
 const state = loadState();
@@ -137,6 +205,8 @@ function save() {
   try {
     const ser = progress.serialize();
     ser.collected = state.progress.collected;
+    ser.met = state.progress.met;
+    ser.games = state.progress.games;
     localStorage.setItem(STORE_KEY, JSON.stringify({
       ...state,
       progress: ser,
@@ -345,13 +415,16 @@ function rebuildPlayer(id) {
 let npcs = [];
 function rebuildNpcs() {
   for (const n of npcs) {
+    n.doll.group.parent && n.doll.group.parent.remove(n.doll.group);
     n.doll.dispose();
-    world.group.remove(n.doll.group);
   }
   npcs = [];
-  const others = CHARACTERS.filter((c) => c.id !== currentChar.id);
+  const others = CHARACTERS.filter((c) => c.id !== currentChar.id && !c.royal);
   others.forEach((ch, i) => {
     const doll = createDoll(cfgFor(ch.id));
+    const home = world.homes.find((h) => h.npc === ch.id) || null;
+    /* some NPCs start at home */
+    const startHome = home && Math.random() < 0.25;
     let p = null;
     for (let k = 0; k < 30 && !p; k++) {
       const a = (i / others.length) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
@@ -362,19 +435,28 @@ function rebuildNpcs() {
       p = new THREE.Vector3(x, 0, z);
     }
     if (!p) p = new THREE.Vector3(24, 0, 24);
-    doll.group.position.copy(p);
+    if (startHome) {
+      doll.group.position.copy(home.npcSpot);
+      home.interior.group.add(doll.group);
+    } else {
+      doll.group.position.copy(p);
+      world.group.add(doll.group);
+    }
     doll.group.rotation.y = Math.random() * Math.PI * 2;
-    world.group.add(doll.group);
     npcs.push({
-      doll, ch,
+      doll, ch, home,
       state: 'idle',
       timer: 1 + Math.random() * 3,
-      target: p.clone(),
+      target: startHome ? home.npcSpot.clone() : p.clone(),
       speed: 2.2 + Math.random() * 1.2,
       waveTimer: 0.5 + Math.random() * 3,
-      lastPos: p.clone(),
+      lastPos: doll.group.position.clone(),
       stuckTimer: 0,
       tick: i,
+      homeState: startHome ? 'home' : 'out',
+      homeTimer: 30 + Math.random() * 110,
+      goingHome: false,
+      sitting: false,
     });
   });
 }
@@ -389,6 +471,136 @@ function pickNpcTarget(n) {
     return;
   }
   n.target.set(0, 0, 26);
+}
+function pickInteriorTarget(n, bounds) {
+  n.target.set(
+    bounds.minX + Math.random() * (bounds.maxX - bounds.minX), 0,
+    bounds.minZ + Math.random() * (bounds.maxZ - bounds.minZ));
+}
+
+/* ------------------------------------------------------------------ */
+/* The royal family (live inside the castle, never leave)              */
+/* ------------------------------------------------------------------ */
+let royals = [];
+const ROYAL_SPOTS = {
+  jamoh: [2.6, -6.0], dama: [10.6, 2.4], ken: [9.2, -6.2],
+  fay: [9.8, 4.4], whitney: [9.5, -7.6], bleso: [-6.5, 6.2],
+};
+function buildRoyals() {
+  for (const n of royals) {
+    n.doll.group.parent && n.doll.group.parent.remove(n.doll.group);
+    n.doll.dispose();
+  }
+  royals = [];
+  for (const ch of CHARACTERS.filter((c) => c.royal)) {
+    const doll = createDoll(cfgFor(ch.id));
+    const [hx, hz] = ROYAL_SPOTS[ch.id] || [0, 0];
+    doll.group.position.set(hx, 0, hz);
+    doll.group.rotation.y = Math.random() * Math.PI * 2;
+    world.castle.group.add(doll.group);
+    royals.push({
+      doll, ch,
+      state: 'idle',
+      timer: 1 + Math.random() * 4,
+      target: new THREE.Vector3(hx, 0, hz),
+      speed: 1.7 + Math.random() * 0.8,
+      waveTimer: 0.5 + Math.random() * 3,
+      lastPos: new THREE.Vector3(hx, 0, hz),
+      stuckTimer: 0,
+      tick: Math.random() * 10 | 0,
+      sitting: false,
+      sitSpot: null,
+    });
+  }
+}
+function nearestRoyal(maxD = 6.25) {
+  let best = null, bestD = maxD;
+  for (const n of royals) {
+    const d2 = n.doll.group.position.distanceToSquared(player.group.position);
+    if (d2 < bestD) { bestD = d2; best = n; }
+  }
+  return best;
+}
+function updateRoyal(n, dt, t) {
+  const p = n.doll.group.position;
+  _nToPlayer.subVectors(player.group.position, p);
+  const distToPlayer = _nToPlayer.length();
+
+  if (distToPlayer < 3) {
+    /* greet the visitor */
+    n.state = 'greet';
+    n.doll.setPose('stand');
+    n.sitting = false;
+    n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nToPlayer.x, _nToPlayer.z), Math.min(1, dt * 6));
+    n.waveTimer -= dt;
+    if (n.waveTimer <= 0) {
+      n.doll.wave();
+      n.waveTimer = 4 + Math.random() * 4;
+      if (effectsOn() && Math.random() < 0.4) effects.spawnHearts(1, p);
+    }
+    return;
+  }
+  if (n.sitting) {
+    n.timer -= dt;
+    if (n.timer <= 0) {
+      n.sitting = false;
+      n.doll.setPose('stand');
+      n.doll.group.position.y = 0;
+      n.state = 'idle';
+      n.timer = 0.6;
+    }
+    return;
+  }
+  if (n.state === 'idle') {
+    n.timer -= dt;
+    if (n.timer <= 0) {
+      if (Math.random() < 0.35) {
+        /* pick a chair and go sit */
+        const spot = world.castle.sits[(Math.random() * world.castle.sits.length) | 0];
+        n.target.set(spot.x, 0, spot.z);
+        n.sitSpot = spot;
+      } else {
+        pickInteriorTarget(n, world.castle.bounds);
+        n.sitSpot = null;
+      }
+      n.state = 'walk';
+    }
+    return;
+  }
+  /* walking */
+  _nDir.subVectors(n.target, p);
+  _nDir.y = 0;
+  const d = _nDir.length();
+  if (d < 0.35) {
+    if (n.sitSpot && Math.hypot(p.x - n.sitSpot.x, p.z - n.sitSpot.z) < 0.6) {
+      /* arrived at the chair — sit down */
+      n.sitting = true;
+      n.doll.setPose('sit');
+      n.doll.group.position.y = 0.12;
+      n.doll.group.rotation.y = n.sitSpot.ry;
+      n.timer = 7 + Math.random() * 10;
+      n.state = 'sit';
+    } else {
+      n.state = 'idle';
+      n.timer = 1.5 + Math.random() * 3.5;
+    }
+  } else {
+    _nDir.multiplyScalar((n.speed * dt) / d);
+    p.x += _nDir.x;
+    p.z += _nDir.z;
+    n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nDir.x, _nDir.z), Math.min(1, dt * 6));
+  }
+  resolveCastleCollisions(p, 0.26);
+  n.stuckTimer += dt;
+  if (n.stuckTimer > 1.6) {
+    if (p.distanceToSquared(n.lastPos) < 0.09) {
+      pickInteriorTarget(n, world.castle.bounds);
+      n.sitSpot = null;
+      if (n.state === 'idle') n.timer = 0.2;
+    }
+    n.lastPos.copy(p);
+    n.stuckTimer = 0;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -405,7 +617,7 @@ input.onDrag((dx, dy) => {
   cam.lastUser = performance.now() / 1000;
 });
 input.onZoom((dz) => {
-  cam.dist = THREE.MathUtils.clamp(cam.dist + dz, 2.6, game.mode === 'castle' ? 5 : 14);
+  cam.dist = THREE.MathUtils.clamp(cam.dist + dz, 2.6, (game.mode === 'castle' || game.mode === 'house') ? 5.5 : 14);
 });
 const _camDesired = new THREE.Vector3();
 function updateCamera(dt, auto) {
@@ -487,12 +699,31 @@ const QUESTS = [
     desc: () => 'Open the treasure chest inside the candy castle',
     prog: () => 'Open the chest in the castle',
     target: () => world.castleDoor },
+  { id: 'royalDecree', icon: '👑', title: "The King's Decree", reward: 30, giver: 'jamoh',
+    desc: () => 'Meet the royal family inside the palace (Dama, Ken, Fay, Whitney, Bleso)',
+    prog: () => `Met ${royalsMet()} of 5 family members`,
+    target: () => world.castleDoor },
+  { id: 'queensGame', icon: '🎮', title: "The Queen's Arcade", reward: 30, giver: 'dama',
+    desc: () => 'Score 10 or better at the Candy Catch arcade (village kiosk)',
+    prog: () => `Best score: ${state.progress.games.catchBest} / 10`,
+    target: () => world.arcades[0].pos },
+  { id: 'ringChampion', icon: '🏁', title: "Ken's Gummy Rush", reward: 30, giver: 'ken',
+    desc: () => `Finish the Gummy Rush race in under ${RACE_PAR} seconds`,
+    prog: () => state.progress.games.raceBest
+      ? `Best time: ${state.progress.games.raceBest.toFixed(1)}s · par ${RACE_PAR}s`
+      : `Run the race at the blue kiosk · par ${RACE_PAR}s`,
+    target: () => world.arcades[1].pos },
 ];
 const questGiven = (q) => q.auto || progress.questStage(q.id) !== 0;
 function npcById(id) {
   const n = npcs.find((x) => x.ch.id === id);
-  return n ? n.doll.group.position : null;
+  if (!n) return null;
+  if (n.homeState === 'home' && n.home) return n.home.door;
+  return n.doll.group.position;
 }
+const ROYAL_FAMILY = ['dama', 'ken', 'fay', 'whitney', 'bleso'];
+const royalsMet = () => ROYAL_FAMILY.filter((id) => state.progress.met[id]).length;
+const RACE_PAR = 75;
 
 function activeQuest() {
   return QUESTS.find((q) => !progress.isQuestDone(q.id) && questGiven(q)) || null;
@@ -500,6 +731,13 @@ function activeQuest() {
 
 function updateTracker() {
   if (game.mode !== 'world') { trackerEl.innerHTML = ''; world.setBeacon(null); return; }
+  if (game.mini) {
+    trackerEl.innerHTML = game.mini.kind === 'catch'
+      ? `🍭 <b>Candy Catch</b><br><span class="tprog">score <b>${game.mini.score}</b> · ${Math.ceil(Math.max(0, game.mini.t))}s left</span>`
+      : `🏁 <b>Gummy Rush</b> — ring <b>${Math.min(game.mini.idx + 1, world.racePath.length)}/${world.racePath.length}</b><br><span class="tprog">${game.mini.t.toFixed(1)}s · par ${RACE_PAR}s</span>`;
+    world.setBeacon(null);
+    return;
+  }
   const q = activeQuest();
   if (!q) {
     trackerEl.innerHTML = '✨ <b>All quests complete!</b>';
@@ -538,10 +776,19 @@ function renderJournal() {
     row.innerHTML = `
       <div class="qr-head"><span>${q.icon} ${q.title}</span><span class="qr-reward">+${q.reward} XP</span></div>
       <div class="qr-desc">${q.desc()}</div>
-      ${given ? `<div class="qr-desc"><b>${q.prog()}</b></div>` : ''}
-      ${st}`;
+    ${given ? `<div class="qr-desc"><b>${q.prog()}</b></div>` : ''}
+    ${st}`;
     list.appendChild(row);
   }
+  /* arcade records */
+  const games = state.progress.games;
+  const sec = document.createElement('div');
+  sec.className = 'quest-row games-row';
+  sec.innerHTML = `
+    <div class="qr-head"><span>🎮 Arcade Records</span></div>
+    <div class="qr-desc">🍭 Candy Catch — best score: <b>${games.catchBest}</b> (kiosk in the village)</div>
+    <div class="qr-desc">🏁 Gummy Rush — best time: <b>${games.raceBest !== null && games.raceBest !== undefined ? games.raceBest.toFixed(1) + 's' : '—'}</b> · par ${RACE_PAR}s (blue kiosk)</div>`;
+  list.appendChild(sec);
 }
 function nameOf(id) {
   const c = CHARACTERS.find((x) => x.id === id);
@@ -586,12 +833,15 @@ function updateQuests() {
     completeQuest('peakSightseer');
   }
   if (!progress.isQuestDone('royalTreasure') && world.castle.chest.opened) completeQuest('royalTreasure');
+  if (!progress.isQuestDone('royalDecree') && progress.questStage('royalDecree') === 1 && royalsMet() >= 5) {
+    completeQuest('royalDecree');
+  }
 }
 
 /* ------------------------------------------------------------------ */
 /* Character chips                                                     */
 /* ------------------------------------------------------------------ */
-const charBtns = CHARACTERS.map((c) => {
+const charBtns = CHARACTERS.filter((c) => !c.royal).map((c) => {
   const b = document.createElement('button');
   b.className = 'charchip';
   b.innerHTML = `<span class="ce">${c.emoji}</span><span>${c.name}</span>`;
@@ -740,9 +990,26 @@ function buildWardrobePanel() {
           b.addEventListener('click', () => toast('🛍️ Buy the <b>Sparkle Trail</b> in the Candy Boutique!', 2400));
           chipsWrap.appendChild(b);
         }
+        /* pets (boutique, toggle — one companion at a time) */
+        for (const p of PETS) {
+          const owned = !!state.purchases['pet_' + p.id];
+          const b = el('button', 'chip', owned ? `${p.icon} ${p.name}` : `${p.icon} ${p.name}<small>🛍️ ${p.price} candies</small>`);
+          if (!owned) {
+            b.classList.add('locked');
+            b.addEventListener('click', () => toast(`🛍️ Buy <b>${p.name}</b> in the Candy Boutique!`, 2400));
+          } else {
+            b.addEventListener('click', () => {
+              setPet(state.settings.pet === p.id ? null : p.id);
+              syncUI();
+            });
+          }
+          chipsWrap.appendChild(b);
+          btns.push({ b, o: { id: '__pet_' + p.id }, kind: 'pet', petId: p.id });
+        }
         uiSync.push(() => {
-          for (const { b, o, kind } of btns) {
+          for (const { b, o, kind, petId } of btns) {
             if (kind === 'trail') b.classList.toggle('on', !!state.settings.trail);
+            else if (kind === 'pet') b.classList.toggle('on', state.settings.pet === petId);
             else b.classList.toggle('on', !lockInfo(o) && !!player.cfg.accessories[o.id]);
           }
         });
@@ -786,6 +1053,7 @@ const SHOP = [
   { id: 'wand', icon: '🪄', name: 'Star Wand', price: 25, desc: 'A twinkling wand held in the right hand.' },
   { id: 'wings', icon: '🦋', name: 'Butterfly Wings', price: 35, desc: 'Flapping rainbow wings (also unlocks at Lv 3).' },
   { id: 'trail', icon: '💫', name: 'Sparkle Trail', price: 35, desc: 'Leave sparkles wherever you run.' },
+  ...PETS.map((p) => ({ id: 'pet_' + p.id, icon: p.icon, name: p.name, price: p.price, desc: p.desc + ' Follows you everywhere.', pet: p.id })),
   { id: 'halo', icon: '🌟', name: 'Golden Halo', price: 50, desc: 'A glowing halo (also unlocks at Lv 4).' },
 ];
 function renderShop() {
@@ -821,8 +1089,14 @@ function buyItem(item) {
   if (balance < item.price || state.purchases[item.id]) return;
   state.spent += item.price;
   state.purchases[item.id] = true;
-  save();
-  toast(`🛍️ Purchased <b>${item.name}</b>! Equip it in the wardrobe.`, 3200);
+  if (item.pet && !state.settings.pet) {
+    setPet(item.pet); /* auto-equip the first pet */
+  } else {
+    save();
+  }
+  toast(item.pet
+    ? `🐾 <b>${item.name}</b> joins your adventure!`
+    : `🛍️ Purchased <b>${item.name}</b>! Equip it in the wardrobe.`, 3200);
   if (effectsOn()) effects.spawnConfetti(16, player.group.position);
   updateStats();
   renderShop();
@@ -835,6 +1109,150 @@ function openShop() {
   closeJournal();
 }
 function closeShop() { shopEl.classList.add('hidden'); }
+
+/* ------------------------------------------------------------------ */
+/* Pets — follow the player everywhere                                  */
+/* ------------------------------------------------------------------ */
+let petObj = null;
+const _petFollow = new THREE.Vector3();
+function setPet(id) {
+  const ok = id && state.purchases['pet_' + id];
+  if (!ok) id = null;
+  if (petObj) {
+    petObj.group.parent && petObj.group.parent.remove(petObj.group);
+    petObj = null;
+  }
+  state.settings.pet = id;
+  if (id) {
+    petObj = createPet(id);
+    const parent = player.group.parent || scene;
+    parent.add(petObj.group);
+    petObj.group.position.copy(player.group.position);
+    petObj.group.position.x += 0.7;
+    if (effectsOn()) effects.spawnHearts(3, petObj.group.position);
+  }
+  save();
+}
+function reparentPet() {
+  if (petObj && player.group.parent && petObj.group.parent !== player.group.parent) {
+    player.group.parent.add(petObj.group);
+  }
+}
+function updatePet(dt, t) {
+  if (!petObj) return;
+  const pp = player.group.position;
+  const ry = player.group.rotation.y;
+  /* trail slightly behind the player */
+  _petFollow.set(pp.x - Math.sin(ry) * 0.75, 0, pp.z - Math.cos(ry) * 0.75);
+  petObj.update(dt, t, _petFollow, game.walk01 > 0.35 || game.danceT > 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Mini-games (arcade kiosks)                                           */
+/* ------------------------------------------------------------------ */
+const CATCH_GEO = new THREE.SphereGeometry(0.2, 12, 10);
+const CATCH_MATS = ['#ff8fb7', '#ffd45e', '#63b8f5', '#a7d97a', '#b57de0', '#ff9e4f']
+  .map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3, roughness: 0.3 }));
+function startMini(kind) {
+  if (game.mini) { toast('🎮 Finish the current game first!', 2000); return; }
+  if (kind === 'catch') {
+    game.mini = { kind: 'catch', t: 45, score: 0, spawn: 0.2, items: [] };
+    toast('🍭 <b>Candy Catch!</b> Sweets rain from the sky — run and grab them!<br><small>45 seconds · rewards candies</small>', 4200);
+  } else {
+    game.mini = { kind: 'race', idx: 0, t: 0 };
+    for (const r of world.raceRings) { r.visible = true; r.scale.set(1, 1, 1); }
+    toast(`🏁 <b>Gummy Rush!</b> Sprint through the 6 golden rings in order!<br><small>Par time: ${RACE_PAR}s · rewards candies</small>`, 4200);
+  }
+  music.start('dance');
+  if (effectsOn()) effects.spawnConfetti(12, player.group.position);
+  updateTracker();
+}
+function cancelMini(silent) {
+  if (!game.mini) return;
+  for (const m of game.mini.items || []) world.group.remove(m);
+  for (const r of world.raceRings) { r.visible = false; r.scale.set(1, 1, 1); }
+  game.mini = null;
+  if (!silent) { music.start('ambient'); updateTracker(); }
+}
+function finishCatch() {
+  const mini = game.mini;
+  const g = state.progress.games;
+  const score = mini.score;
+  const first = !g.catchFirst && score >= 3;
+  const reward = first ? Math.min(20, Math.max(2, score)) : Math.min(6, Math.floor(score / 3));
+  if (score > g.catchBest) g.catchBest = score;
+  if (score >= 3) g.catchFirst = true;
+  cancelMini(true);
+  if (reward > 0) progress.addCandies(reward);
+  music.start('ambient');
+  toast(`🍭 <b>Candy Catch over!</b> Score: <b>${score}</b> · best ${g.catchBest} · <b>+${reward} candies</b>${first ? ' 🎉' : ''}`, 4200);
+  updateStats(); save(); updateTracker();
+}
+function finishRace() {
+  const mini = game.mini;
+  const time = mini.t;
+  const g = state.progress.games;
+  const isRecord = g.raceBest === null || time < g.raceBest;
+  if (isRecord) g.raceBest = Math.round(time * 10) / 10;
+  const win = time <= RACE_PAR;
+  const first = win && !g.raceFirst;
+  const reward = first ? 15 : (win ? 5 : 2);
+  if (win) g.raceFirst = true;
+  cancelMini(true);
+  progress.addCandies(reward);
+  music.start('ambient');
+  if (effectsOn()) effects.spawnConfetti(30, player.group.position);
+  toast(`🏁 <b>Race finished!</b> Time <b>${time.toFixed(1)}s</b>${isRecord ? ' · new best!' : ''} · <b>+${reward} candies</b>${win ? '' : ' (over par)'}`, 4200);
+  updateStats(); save(); updateTracker();
+}
+function updateMini(dt, t) {
+  const mini = game.mini;
+  if (!mini) return;
+  const p = player.group.position;
+  if (mini.kind === 'catch') {
+    mini.t -= dt;
+    mini.spawn -= dt;
+    if (mini.spawn <= 0 && mini.items.length < 14) {
+      mini.spawn = Math.max(0.4, 0.85 - mini.score * 0.02);
+      const m = new THREE.Mesh(CATCH_GEO, CATCH_MATS[(Math.random() * CATCH_MATS.length) | 0]);
+      m.position.set(p.x + (Math.random() - 0.5) * 9, 8.5, p.z + (Math.random() - 0.5) * 9);
+      world.group.add(m);
+      mini.items.push(m);
+    }
+    for (let i = mini.items.length - 1; i >= 0; i--) {
+      const m = mini.items[i];
+      m.position.y -= dt * (3.1 + Math.min(1.4, mini.score * 0.02));
+      m.rotation.y += dt * 3;
+      const dx = p.x - m.position.x, dz = p.z - m.position.z;
+      if (m.position.y < 1.8 && m.position.y > 0.2 && dx * dx + dz * dz < 1.1) {
+        mini.score++;
+        world.group.remove(m);
+        mini.items.splice(i, 1);
+        if (effectsOn()) effects.spawnHearts(1, m.position);
+        continue;
+      }
+      if (m.position.y < 0.22) { world.group.remove(m); mini.items.splice(i, 1); }
+    }
+    if (mini.t <= 0) finishCatch();
+  } else {
+    mini.t += dt;
+    const ring = world.raceRings[mini.idx];
+    if (ring) {
+      const s = 1 + Math.sin(t * 6) * 0.14;
+      ring.scale.set(s, s, s);
+      ring.rotation.y += dt * 0.8;
+      const tp = world.racePath[mini.idx];
+      if (Math.hypot(p.x - tp.x, p.z - tp.z) < 2.6) {
+        ring.visible = false;
+        ring.scale.set(1, 1, 1);
+        mini.idx++;
+        if (effectsOn()) effects.spawnConfetti(8, new THREE.Vector3(tp.x, 1.4, tp.z));
+        if (mini.idx >= world.racePath.length) finishRace();
+        else toast(`🏁 Ring <b>${mini.idx}/${world.racePath.length}</b>!`, 1400);
+      }
+    }
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /* Quest journal overlay                                               */
@@ -859,6 +1277,7 @@ const game = {
   doorHintShown: false,
   chestHintShown: false,
   trailTimer: 0,
+  mini: null,
 };
 
 function enterWorld() {
@@ -897,11 +1316,13 @@ function enterWorld() {
   const done = QUESTS.filter((q) => progress.isQuestDone(q.id)).length;
   toast(`${currentChar.emoji} <b>${currentChar.name}</b> enters Candy World!<br><small>${done < QUESTS.length ? '📜 Journal shows your quests — follow the golden beacon!' : 'All quests complete — enjoy the world!'}</small>`, 4200);
   if (effectsOn()) effects.spawnHearts(3, player.group.position);
+  reparentPet();
   save();
 }
 function enterStudio() {
   game.mode = 'studio';
   state.mode = 'studio';
+  cancelMini(true);
   titleEl.classList.remove('hidden');
   panelEl.classList.remove('hidden');
   hudEl.classList.add('hidden');
@@ -922,15 +1343,18 @@ function enterStudio() {
   studioGroup.add(player.group);
   player.group.position.set(0, 0.01, 0);
   player.group.rotation.y = 0;
+  if (player.sitting()) player.setPose('stand');
   cam.target.set(0, 0.85, 0);
   cam.yaw = 0.35; cam.pitch = 0.42; cam.dist = 3.4;
   camera.position.set(1.2, 2.2, 3.2);
   renderCharInfo();
+  reparentPet();
   save();
 }
 
 /* castle mode */
 function enterCastle() {
+  cancelMini(true);
   game.mode = 'castle';
   world.group.visible = false;
   world.setBeacon(null);
@@ -940,19 +1364,25 @@ function enterCastle() {
   scene.fog = castleFog;
 
   world.castle.group.add(player.group);
-  player.group.position.set(0, 0, 3.8);
+  player.group.position.set(0, 0, 8.2);
   player.group.rotation.y = Math.PI;
   game.vy = 0;
   game.walk01 = 0;
   game.chestHintShown = false;
+  game.doorHintShown = false;
+  if (player.sitting()) player.setPose('stand');
 
-  cam.target.set(0, 1.1, 3.8);
-  cam.yaw = 0; cam.pitch = 0.35; cam.dist = 4.2;
-  camera.position.set(0, 2.6, 7.6);
-  toast('🏰 <b>The Candy Castle</b> — throne room of the realm.<br><small>Find the treasure chest… and try the throne</small>', 3600);
+  cam.target.set(0, 1.1, 6.5);
+  cam.yaw = 0; cam.pitch = 0.35; cam.dist = 4.6;
+  camera.position.set(0, 3, 11);
+  toast("🏰 <b>The Royal Palace</b> — home of King Jamoh's family.<br><small>Meet the royals · find the vault · sit on the throne · visit your chambers in the west wing</small>", 4200);
+  reparentPet();
+  save();
 }
 function exitCastleScene() {
   world.castle.group.visible = false;
+  for (const h of world.homes) h.interior.group.visible = false;
+  activeHome = null;
 }
 function leaveCastle() {
   game.mode = 'world';
@@ -966,9 +1396,91 @@ function leaveCastle() {
   player.group.position.z -= 1.2;
   player.group.position.y = 0;
   player.group.rotation.y = 0;
+  if (player.sitting()) player.setPose('stand');
   game.doorHintShown = false;
   cam.target.set(player.group.position.x, 1.1, player.group.position.z);
   updateTracker();
+  reparentPet();
+  save();
+}
+
+/* ------------------------------------------------------------------ */
+/* NPC homes (enterable)                                               */
+/* ------------------------------------------------------------------ */
+let activeHome = null;
+function enterHome(home) {
+  cancelMini(true);
+  game.mode = 'house';
+  activeHome = home;
+  world.group.visible = false;
+  world.setBeacon(null);
+  trackerEl.innerHTML = '';
+  home.interior.group.visible = true;
+  scene.background = studioBg;
+  scene.fog = castleFog;
+
+  home.interior.group.add(player.group);
+  player.group.position.set(0, 0, 1.6);
+  player.group.rotation.y = Math.PI;
+  game.vy = 0;
+  game.walk01 = 0;
+  game.doorHintShown = false;
+  if (player.sitting()) player.setPose('stand');
+
+  cam.target.set(0, 1.1, 1.0);
+  cam.yaw = 0; cam.pitch = 0.4; cam.dist = 4.4;
+  camera.position.set(0, 2.4, 5.6);
+  const who = nameOf(home.npc);
+  toast(`🏡 <b>${who}'s Home</b> — make yourself comfortable!<br><small>${who} wanders in and out… sit on a chair, say hello</small>`, 3600);
+  reparentPet();
+  save();
+}
+function leaveHome() {
+  if (!activeHome) return;
+  const home = activeHome;
+  game.mode = 'world';
+  home.interior.group.visible = false;
+  activeHome = null;
+  world.group.visible = true;
+  scene.background = worldBg;
+  scene.fog = worldFog;
+
+  world.group.add(player.group);
+  player.group.position.copy(home.exit);
+  player.group.position.y = 0;
+  player.group.rotation.y = Math.atan2(home.exit.x - home.pos.x, home.exit.z - home.pos.z);
+  if (player.sitting()) player.setPose('stand');
+  game.doorHintShown = false;
+  cam.target.set(player.group.position.x, 1.1, player.group.position.z);
+  updateTracker();
+  reparentPet();
+  save();
+}
+function nearestHomeDoor() {
+  let best = null, bestD = 9.6; /* ~3.1m squared */
+  for (const h of world.homes) {
+    const d2 = player.group.position.distanceToSquared(h.door);
+    if (d2 < bestD) { bestD = d2; best = h; }
+  }
+  return best;
+}
+function nearestArcade() {
+  let best = null, bestD = 7.8; /* ~2.8m squared */
+  for (const a of world.arcades) {
+    const d2 = player.group.position.distanceToSquared(a.pos);
+    if (d2 < bestD) { bestD = d2; best = a; }
+  }
+  return best;
+}
+
+/* sit the player on a spot (chair / sofa / throne) */
+function playerSit(spot, label) {
+  player.group.position.set(spot.x, 0.18, spot.z);
+  player.group.rotation.y = spot.ry;
+  player.setPose('sit');
+  player.boing();
+  if (effectsOn()) effects.spawnHearts(2, player.group.position);
+  toast(label || '😌 You sit down. <i>Move to stand up.</i>', 2600);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1001,6 +1513,7 @@ function dchoiceBtn(label, fn, isQuest) {
 function nearestNpc() {
   let best = null, bestD = 25;
   for (const n of npcs) {
+    if (n.homeState === 'home') continue; /* inside their house */
     const d2 = n.doll.group.position.distanceToSquared(player.group.position);
     if (d2 < bestD) { bestD = d2; best = n; }
   }
@@ -1036,6 +1549,35 @@ function npcQuestAction(n) {
     }
     return;
   }
+  if (q.id === 'royalDecree') {
+    if (royalsMet() >= 5) {
+      completeQuest(q.id);
+      dialogueHtml(n.ch.name, n.ch.emoji, q.done, null);
+    } else {
+      dialogueHtml(n.ch.name, n.ch.emoji, q.active.replace('{N}', royalsMet()), null);
+    }
+    return;
+  }
+  if (q.id === 'queensGame') {
+    if (state.progress.games.catchBest >= 10) {
+      completeQuest(q.id);
+      dialogueHtml(n.ch.name, n.ch.emoji, q.done, null);
+    } else {
+      dialogueHtml(n.ch.name, n.ch.emoji, q.active.replace('{N}', state.progress.games.catchBest), null);
+    }
+    return;
+  }
+  if (q.id === 'ringChampion') {
+    const best = state.progress.games.raceBest;
+    if (best !== null && best <= RACE_PAR) {
+      completeQuest(q.id);
+      dialogueHtml(n.ch.name, n.ch.emoji, q.done, null);
+    } else {
+      dialogueHtml(n.ch.name, n.ch.emoji,
+        q.active.replace('{N}', best === null ? 'no time yet' : best.toFixed(1) + 's').replace('{PAR}', RACE_PAR), null);
+    }
+    return;
+  }
   dialogueHtml(n.ch.name, n.ch.emoji, q.active, null);
 }
 
@@ -1067,6 +1609,20 @@ function talkToNpc(n) {
     updateTracker();
     save();
   }
+
+  /* the King's decree: remember which royals you have met */
+  if (n.ch.royal && !state.progress.met[n.ch.id]) {
+    state.progress.met[n.ch.id] = true;
+    save();
+    if (progress.questStage('royalDecree') === 1 && !progress.isQuestDone('royalDecree')) {
+      updateTracker();
+      if (n.ch.id !== 'jamoh') toast(`👑 Family met: <b>${royalsMet()}/5</b>`, 2000);
+    } else if (n.ch.id !== 'jamoh' && !state.progress.met.__royalHello) {
+      state.progress.met.__royalHello = true;
+      toast('👑 You met the royal family! Talk to <b>King Jamoh</b> for his decree.', 3200);
+      save();
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1075,7 +1631,19 @@ function talkToNpc(n) {
 function interact() {
   if (dialogueOpen) { closeDialogue(); return; }
   if (game.mode === 'world') {
-    /* near castle door? */
+    /* arcade kiosks (mini-games) */
+    const arc = nearestArcade();
+    if (arc) {
+      startMini(arc.id);
+      return;
+    }
+    /* an NPC's front door? */
+    const home = nearestHomeDoor();
+    if (home) {
+      enterHome(home);
+      return;
+    }
+    /* palace gate? */
     if (player.group.position.distanceTo(world.castleDoor) < 3.4) {
       enterCastle();
       return;
@@ -1086,26 +1654,60 @@ function interact() {
       return;
     }
     toast('Nobody is close enough to talk to 🤔 — walk up to a doll!', 2200);
+  } else if (game.mode === 'house') {
+    /* the owner might be home */
+    const owner = npcs.find((x) => x.home === activeHome);
+    if (owner && owner.homeState === 'home' &&
+        owner.doll.group.position.distanceTo(player.group.position) < 2.6) {
+      talkToNpc(owner);
+      return;
+    }
+    /* door -> leave */
+    if (player.group.position.z > 1.6 && Math.abs(player.group.position.x) < 1.0) {
+      leaveHome();
+      return;
+    }
+    /* chairs */
+    for (const s of activeHome.interior.sits) {
+      if (Math.hypot(player.group.position.x - s.x, player.group.position.z - s.z) < 1.4) {
+        playerSit(s);
+        return;
+      }
+    }
+    toast(`${nameOf(activeHome.npc)} is out exploring — come back later! 🚶`, 2400);
   } else if (game.mode === 'castle') {
+    /* near door -> leave */
+    if (player.group.position.z > 7.8 && Math.abs(player.group.position.x) < 1.3) {
+      leaveCastle();
+      return;
+    }
+    /* a royal right next to you? (takes precedence over furniture) */
+    const royal = nearestRoyal(2.56); /* 1.6m */
+    if (royal) {
+      talkToNpc(royal);
+      return;
+    }
     /* near chest? */
     const c = world.castle.chest.group.position;
     if (player.group.position.distanceTo(c) < 2.2) {
       openChest();
       return;
     }
-    /* near door -> leave */
-    if (player.group.position.z > 4.0 && Math.abs(player.group.position.x) < 1.4) {
-      leaveCastle();
+    /* the throne */
+    if (Math.hypot(player.group.position.x, player.group.position.z + 7.4) < 1.7) {
+      if (player.sitting()) { player.setPose('stand'); player.group.position.y = 0; return; }
+      playerSit({ x: 0, z: -7.3, ry: 0 }, '👑 You sit on the throne. <i>All of Candy World salutes you!</i>');
       return;
     }
-    /* throne */
-    if (Math.hypot(player.group.position.x, player.group.position.z + 3.6) < 1.8) {
-      player.boing();
-      if (effectsOn()) effects.spawnHearts(3, player.group.position);
-      toast('👑 You sit on the throne. <i>All of Candy World salutes you!</i>', 3000);
-      return;
+    /* chairs & sofas */
+    for (const s of world.castle.sits) {
+      if (Math.hypot(player.group.position.x - s.x, player.group.position.z - s.z) < 1.2) {
+        if (player.sitting()) { player.setPose('stand'); player.group.position.y = 0; return; }
+        playerSit(s);
+        return;
+      }
     }
-    toast('Explore the throne room — the chest glows in the corner 🔒', 2200);
+    toast('Explore the palace — the royals wander these halls 👑', 2200);
   }
 }
 
@@ -1130,7 +1732,7 @@ function openChest() {
 /* Buttons & keys                                                      */
 /* ------------------------------------------------------------------ */
 $('btnEnter').addEventListener('click', enterWorld);
-$('btnHome').addEventListener('click', () => { if (game.mode === 'castle') leaveCastle(); enterStudio(); });
+$('btnHome').addEventListener('click', () => { if (game.mode === 'castle') leaveCastle(); if (game.mode === 'house') leaveHome(); enterStudio(); });
 $('btnCustomize').addEventListener('click', () => panelEl.classList.toggle('hidden'));
 $('btnDance').addEventListener('click', () => {
   if (game.danceT > 0) {
@@ -1215,7 +1817,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyF') game.spinT = 1.6;
   if (e.code === 'KeyM') $('btnMute').click();
   if (e.code === 'Escape') { closeSettings(); closeJournal(); closeShop(); closeDialogue(); }
-  if (e.code === 'KeyH' && game.mode !== 'studio') { if (game.mode === 'castle') leaveCastle(); enterStudio(); }
+  if (e.code === 'KeyH' && game.mode !== 'studio') { if (game.mode === 'castle') leaveCastle(); if (game.mode === 'house') leaveHome(); enterStudio(); }
 });
 
 /* audio unlock on first gesture — respects the saved music preference */
@@ -1281,8 +1883,7 @@ function resolveWorldCollisions(p, r) {
     p.z = (p.z / bd) * (world.R_BOUND - 1);
   }
 }
-function resolveCastleCollisions(p, r) {
-  const boxes = world.castle.boxes;
+function resolveBoxCircle(boxes, circles, p, r) {
   for (const b of boxes) {
     if (p.x + r < b.minX || p.x - r > b.maxX || p.z + r < b.minZ || p.z - r > b.maxZ) continue;
     const cx = Math.max(b.minX, Math.min(p.x, b.maxX));
@@ -1306,7 +1907,7 @@ function resolveCastleCollisions(p, r) {
       else p.z = b.maxZ + r;
     }
   }
-  for (const c of world.castle.circles) {
+  for (const c of circles) {
     const dx = p.x - c.x, dz = p.z - c.z;
     const rr = c.r + r;
     const d2 = dx * dx + dz * dz;
@@ -1317,12 +1918,28 @@ function resolveCastleCollisions(p, r) {
     }
   }
 }
+function resolveCastleCollisions(p, r) {
+  resolveBoxCircle(world.castle.boxes, world.castle.circles, p, r);
+}
 
 function updatePlayer(dt, t) {
   const p = player.group.position;
   const ax = input.axis();
   const running = input.running();
   const inCastle = game.mode === 'castle';
+  const inHouse = game.mode === 'house';
+
+  /* stand up from a chair when the player moves */
+  if (player.sitting()) {
+    if (ax.len > 0.08) {
+      player.setPose('stand');
+      player.group.position.y = 0;
+    } else {
+      game.walk01 = Math.max(0, game.walk01 - dt * 4);
+      player.group.position.y = 0.18;
+      return;
+    }
+  }
 
   if (ax.len > 0.08 && game.danceT <= 0) {
     const speed = currentChar.speed * (running ? 1.45 : 1) * (0.45 + 0.55 * ax.len);
@@ -1359,6 +1976,7 @@ function updatePlayer(dt, t) {
   }
 
   if (inCastle) resolveCastleCollisions(p, PLAYER_R);
+  else if (inHouse && activeHome) resolveBoxCircle(activeHome.interior.boxes, activeHome.interior.circles, p, PLAYER_R);
   else resolveWorldCollisions(p, PLAYER_R);
 
   /* spin emote */
@@ -1385,6 +2003,13 @@ function updatePlayer(dt, t) {
     }
   }
 
+  if (inHouse) {
+    if (p.z > 1.6 && Math.abs(p.x) < 1.0 && !game.doorHintShown) {
+      game.doorHintShown = true;
+      toast('🚪 Press <b>E</b> to step outside', 2400);
+    }
+    return;
+  }
   if (inCastle) {
     /* hints inside the castle */
     const chest = world.castle.chest;
@@ -1392,9 +2017,9 @@ function updatePlayer(dt, t) {
       game.chestHintShown = true;
       toast('🗝️ Press <b>E</b> to open the royal vault!', 2600);
     }
-    if (p.z > 4.0 && Math.abs(p.x) < 1.4 && !game.doorHintShown) {
+    if (p.z > 7.2 && Math.abs(p.x) < 1.4 && !game.doorHintShown) {
       game.doorHintShown = true;
-      toast('🚪 Press <b>E</b> to leave the castle', 2400);
+      toast('🚪 Press <b>E</b> to leave the palace', 2400);
     }
     return;
   }
@@ -1468,16 +2093,124 @@ const _nToPlayer = new THREE.Vector3();
 const _nDir = new THREE.Vector3();
 let npcTick = 0;
 
+function enterNpcHome(n) {
+  n.home.interior.group.add(n.doll.group);
+  n.doll.group.position.copy(n.home.npcSpot);
+  n.doll.group.position.y = 0;
+  n.doll.group.rotation.y = Math.PI + (Math.random() - 0.5);
+  n.homeState = 'home';
+  n.goingHome = false;
+  n.state = 'idle';
+  n.timer = 1;
+  n.homeTimer = 40 + Math.random() * 80;
+  n.sitting = false;
+  n.doll.setPose('stand');
+  n.lastPos.copy(n.doll.group.position);
+}
+function exitNpcHome(n) {
+  world.group.add(n.doll.group);
+  n.doll.group.position.copy(n.home.exit);
+  n.doll.group.position.y = 0;
+  n.homeState = 'out';
+  n.homeTimer = 60 + Math.random() * 140;
+  n.state = 'idle';
+  n.timer = 0.5;
+  n.sitting = false;
+  n.doll.setPose('stand');
+  n.target.set(0, 0, 26);
+  n.lastPos.copy(n.doll.group.position);
+}
+
 function updateNpc(n, dt, t) {
   const p = n.doll.group.position;
+
+  /* ---- inside their own house ---- */
+  if (n.homeState === 'home') {
+    if (!activeHome || activeHome !== n.home) return; /* frozen while nobody watches */
+    _nToPlayer.subVectors(player.group.position, p);
+    const distToPlayer = _nToPlayer.length();
+    n.homeTimer -= dt;
+    if (n.homeTimer <= 0) { exitNpcHome(n); return; }
+
+    if (n.sitting) {
+      n.timer -= dt;
+      if (n.timer <= 0) {
+        n.sitting = false;
+        n.doll.setPose('stand');
+        n.doll.group.position.y = 0;
+        n.state = 'idle';
+        n.timer = 1;
+      }
+    } else if (distToPlayer < 2.5) {
+      n.state = 'greet';
+      n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nToPlayer.x, _nToPlayer.z), Math.min(1, dt * 6));
+      n.waveTimer -= dt;
+      if (n.waveTimer <= 0) {
+        n.doll.wave();
+        n.waveTimer = 4 + Math.random() * 4;
+        if (effectsOn() && Math.random() < 0.4) effects.spawnHearts(1, p);
+      }
+    } else if (n.state === 'idle') {
+      n.timer -= dt;
+      if (n.timer <= 0) {
+        if (Math.random() < 0.3 && n.home.interior.sits.length) {
+          const spot = n.home.interior.sits[(Math.random() * n.home.interior.sits.length) | 0];
+          n.target.set(spot.x, 0, spot.z);
+          n.sitSpot = spot;
+        } else {
+          pickInteriorTarget(n, n.home.interior.bounds);
+          n.sitSpot = null;
+        }
+        n.state = 'walk';
+      }
+    } else {
+      _nDir.subVectors(n.target, p);
+      _nDir.y = 0;
+      const d = _nDir.length();
+      if (d < 0.4) {
+        if (n.sitSpot && Math.hypot(p.x - n.sitSpot.x, p.z - n.sitSpot.z) < 0.55) {
+          n.sitting = true;
+          n.doll.setPose('sit');
+          n.doll.group.position.y = 0.12;
+          n.doll.group.rotation.y = n.sitSpot.ry;
+          n.timer = 8 + Math.random() * 12;
+        } else {
+          n.state = 'idle';
+          n.timer = 1.5 + Math.random() * 3;
+        }
+      } else {
+        _nDir.multiplyScalar((n.speed * 0.7 * dt) / d);
+        p.x += _nDir.x;
+        p.z += _nDir.z;
+        n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nDir.x, _nDir.z), Math.min(1, dt * 6));
+      }
+      resolveBoxCircle(n.home.interior.boxes, n.home.interior.circles, p, 0.3);
+    }
+    n.doll.update({ walk01: n.state === 'walk' ? 0.55 : 0, dance01: 0, beatPhase: music.beatPhase() }, dt, t);
+    return;
+  }
+
+  /* ---- out in the world ---- */
   _nToPlayer.subVectors(player.group.position, p);
   const distToPlayer = _nToPlayer.length();
   npcTick++;
 
   if (distToPlayer > 45 && (npcTick + n.tick) % 3 !== 0) return;
 
+  /* homing: head home when the timer fires */
+  if (n.home && !n.goingHome && distToPlayer > 12) {
+    n.homeTimer -= dt;
+    if (n.homeTimer <= 0) {
+      n.goingHome = true;
+      n.target.copy(n.home.door);
+      n.state = 'walk';
+      n.sitSpot = null;
+    }
+  }
+
   if (distToPlayer < 3 && game.mode === 'world') {
     n.state = 'greet';
+    n.goingHome = false; /* pause to greet the player */
     n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nToPlayer.x, _nToPlayer.z), Math.min(1, dt * 6));
     n.waveTimer -= dt;
     if (n.waveTimer <= 0) {
@@ -1485,6 +2218,18 @@ function updateNpc(n, dt, t) {
       n.waveTimer = 4 + Math.random() * 4;
       if (effectsOn() && Math.random() < 0.4) effects.spawnHearts(1, p);
     }
+  } else if (n.goingHome) {
+    const door = n.home.door;
+    _nDir.set(door.x - p.x, 0, door.z - p.z);
+    const d = _nDir.length();
+    if (d < 0.8) {
+      enterNpcHome(n);
+      return;
+    }
+    _nDir.multiplyScalar((n.speed * 1.15 * dt) / d);
+    p.x += _nDir.x;
+    p.z += _nDir.z;
+    n.doll.group.rotation.y = lerpAngle(n.doll.group.rotation.y, Math.atan2(_nDir.x, _nDir.z), Math.min(1, dt * 6));
   } else if (n.state === 'idle') {
     n.timer -= dt;
     if (n.timer <= 0) {
@@ -1509,7 +2254,8 @@ function updateNpc(n, dt, t) {
   n.stuckTimer += dt;
   if (n.stuckTimer > 1.6) {
     if (p.distanceToSquared(n.lastPos) < 0.09) {
-      pickNpcTarget(n);
+      if (n.goingHome) n.target.copy(n.home.door);
+      else pickNpcTarget(n);
       if (n.state === 'idle') n.timer = 0.2;
     }
     n.lastPos.copy(p);
@@ -1521,7 +2267,7 @@ function updateNpc(n, dt, t) {
   if (bd > world.R_BOUND - 1.5) {
     n.target.set(0, 0, 26);
   }
-  n.doll.update({ walk01: n.state === 'walk' ? 0.7 : 0, dance01: 0, beatPhase: music.beatPhase() }, dt, t);
+  n.doll.update({ walk01: n.state === 'walk' || n.goingHome ? 0.7 : 0, dance01: 0, beatPhase: music.beatPhase() }, dt, t);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1547,6 +2293,7 @@ function animate() {
   if (game.mode === 'studio') {
     studioGroup.rotation.y += dt * 0.12;
     if (studioGroup.userData.update) studioGroup.userData.update(dt, t);
+    game.walk01 = 0;
     player.update({ walk01: 0, dance01: game.danceT > 0 ? 1 : 0, beatPhase: beat }, dt, t);
     if (game.danceT > 0) {
       game.danceT -= dt;
@@ -1558,6 +2305,15 @@ function animate() {
   } else if (game.mode === 'castle') {
     updatePlayer(dt, t);
     player.update({ walk01: game.walk01, dance01: game.danceT > 0 ? 1 : 0, beatPhase: beat }, dt, t);
+    for (const r of royals) updateRoyal(r, dt, t);
+    world.update(dt, t);
+    cam.target.set(player.group.position.x, player.group.position.y + 1.1, player.group.position.z);
+    updateCamera(dt, false);
+    _lightTarget.copy(player.group.position);
+  } else if (game.mode === 'house') {
+    updatePlayer(dt, t);
+    player.update({ walk01: game.walk01, dance01: game.danceT > 0 ? 1 : 0, beatPhase: beat }, dt, t);
+    for (const n of npcs) updateNpc(n, dt, t); /* the owner runs if they are home */
     world.update(dt, t);
     cam.target.set(player.group.position.x, player.group.position.y + 1.1, player.group.position.z);
     updateCamera(dt, false);
@@ -1566,11 +2322,15 @@ function animate() {
     updatePlayer(dt, t);
     player.update({ walk01: game.walk01, dance01: game.danceT > 0 ? 1 : 0, beatPhase: beat }, dt, t);
     for (const n of npcs) updateNpc(n, dt, t);
+    updateMini(dt, t);
+    if (game.mini) updateTracker();
     world.update(dt, t);
     cam.target.set(player.group.position.x, player.group.position.y + 1.1, player.group.position.z);
     updateCamera(dt, false);
     _lightTarget.copy(player.group.position);
   }
+
+  updatePet(dt, t);
 
   key.position.set(_lightTarget.x + 6, _lightTarget.y + 11, _lightTarget.z + 5);
   key.target.position.copy(_lightTarget);
@@ -1598,7 +2358,9 @@ $('btnMute').textContent = state.settings.music ? '🔊' : '🔇';
 
 /* boot */
 rebuildNpcs();
+buildRoyals();
 if (state.mode === 'world') enterWorld(); else enterStudio();
+if (state.settings.pet && state.purchases['pet_' + state.settings.pet]) setPet(state.settings.pet);
 updateStats();
 renderShop();
 
@@ -1607,21 +2369,40 @@ const DEBUG = (typeof import.meta !== 'undefined' && import.meta.env && import.m
   new URLSearchParams(location.search).has('debug');
 if (DEBUG) {
   window.__trepio = {
-    game, world, player, npcs, music, progress, quests: QUESTS,
+    game, world, player, npcs, royals, music, progress, quests: QUESTS,
     teleport(x, z) { player.group.position.set(x, 0, z); },
-    interact, enterCastle, leaveCastle, openChest, state: state,
+    interact, enterCastle, leaveCastle, openChest, raw: state,
+    enterHome(id) { const h = world.homes.find((x) => x.id === id); if (h) enterHome(h); },
+    leaveHome, startMini, cancelMini, setPet,
+    forceNpcHome(id, home) {
+      const n = npcs.find((x) => x.ch.id === id);
+      if (!n || !n.home) return false;
+      if (home) enterNpcHome(n); else exitNpcHome(n);
+      return true;
+    },
     buy(id) { const it = SHOP.find((x) => x.id === id); if (it) buyItem(it); },
     state() {
+      const owner = activeHome ? npcs.find((x) => x.home === activeHome) : null;
       return {
         mode: game.mode,
+        home: activeHome ? activeHome.id : null,
+        ownerHome: owner ? owner.homeState : null,
         pos: player.group.position.toArray(),
         npcs: npcs.length,
+        royals: royals.length,
+        royalStates: royals.map((r) => r.ch.id + ':' + (r.sitting ? 'sit' : r.state)),
+        homeStates: npcs.filter((n) => n.home).map((n) => n.ch.id + ':' + n.homeState),
         butterflies: world.butterflies.length,
         candiesActive: world.candies.filter((c) => c.active).length,
         candiesTotal: world.candies.length,
         goldenBear: world.goldenBear.active,
         gemActive: world.gemActive,
         chestOpened: world.castle.chest.opened,
+        mini: game.mini ? { kind: game.mini.kind, score: game.mini.score, idx: game.mini.idx, t: game.mini.t } : null,
+        pet: state.settings.pet,
+        petPos: petObj ? petObj.group.position.toArray() : null,
+        met: state.progress.met,
+        games: state.progress.games,
         gender: player.male ? 'male' : 'female',
         level: progress.level,
         xp: progress.xp,

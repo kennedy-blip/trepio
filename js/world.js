@@ -928,13 +928,14 @@ export function createWorld(scene, keyLight) {
     beacon.position.set(x, 0, z);
   }
 
-  /* ---------------- castle interior (enterable) ---------------- */
-  const castle = { group: new THREE.Group(), boxes: [], circles: [], chandeliers: [] };
+  /* ---------------- castle interior (enterable royal palace) ---------------- */
+  const castle = { group: new THREE.Group(), boxes: [], circles: [], chandeliers: [], sits: [] };
   {
     const g = castle.group;
     g.visible = false;
     scene.add(g);
-    const W = 14, D = 10, H = 5.2;
+    const W = 26, D = 18, H = 5.4;
+    castle.bounds = { minX: -W / 2 + 0.8, maxX: W / 2 - 0.8, minZ: -D / 2 + 0.8, maxZ: D / 2 - 0.9 };
     /* checker floor */
     const floorTex = canvasTex(256, 256, (ctx, w, h) => {
       const s = 32;
@@ -964,15 +965,15 @@ export function createWorld(scene, keyLight) {
     mkWall(D, H, W / 2, H / 2, 0, -Math.PI / 2);          /* east  */
     mkWall(W / 2 - 1, H, -(W / 4 + 0.5), H / 2, D / 2, Math.PI);  /* south left  */
     mkWall(W / 2 - 1, H, (W / 4 + 0.5), H / 2, D / 2, Math.PI);  /* south right */
-    /* colliders */
+    /* outer wall colliders */
     castle.boxes.push({ minX: -W / 2 - 0.3, maxX: -W / 2 + 0.3, minZ: -D / 2, maxZ: D / 2 });
     castle.boxes.push({ minX: W / 2 - 0.3, maxX: W / 2 + 0.3, minZ: -D / 2, maxZ: D / 2 });
     castle.boxes.push({ minX: -W / 2, maxX: W / 2, minZ: -D / 2 - 0.3, maxZ: -D / 2 + 0.3 });
     castle.boxes.push({ minX: -W / 2, maxX: -1, minZ: D / 2 - 0.3, maxZ: D / 2 + 0.3 });
     castle.boxes.push({ minX: 1, maxX: W / 2, minZ: D / 2 - 0.3, maxZ: D / 2 + 0.3 });
-    /* pillars */
+    /* pillars marking the wings */
     const pillarMat = mat('#fdf0f5', { roughness: 0.5 });
-    for (const [px, pz] of [[-4.5, -3], [4.5, -3], [-4.5, 2], [4.5, 2]]) {
+    for (const [px, pz] of [[-5, -6], [-5, 0], [-5, 6], [5, -6], [5, 0], [5, 6]]) {
       const p = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, H, 16), pillarMat);
       p.position.set(px, H / 2, pz);
       p.castShadow = true;
@@ -983,9 +984,9 @@ export function createWorld(scene, keyLight) {
       castle.circles.push({ x: px, z: pz, r: 0.62 });
     }
     /* carpet to the throne */
-    const carpet = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 7.4), mat('#e0457a', { roughness: 0.9 }));
+    const carpet = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 9), mat('#e0457a', { roughness: 0.9 }));
     carpet.rotation.x = -Math.PI / 2;
-    carpet.position.set(0, 0.015, -0.6);
+    carpet.position.set(0, 0.015, -3.4);
     carpet.receiveShadow = true;
     g.add(carpet);
     /* throne */
@@ -1009,9 +1010,28 @@ export function createWorld(scene, keyLight) {
         gemT.position.set(s * 0.66, 1.16, 0.05);
         t.add(gemT);
       }
-      t.position.set(0, 0, -3.6);
+      t.position.set(0, 0, -7.4);
       g.add(t);
-      castle.circles.push({ x: 0, z: -3.6, r: 1.05 });
+      castle.circles.push({ x: 0, z: -7.4, r: 1.05 });
+    }
+    /* council chairs flanking the throne (sit spots) */
+    for (const s of [-1, 1]) {
+      const ch = new THREE.Group();
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.09, 0.55), mat('#c98a2f', { roughness: 0.5 }));
+      seat.position.y = 0.45;
+      ch.add(seat);
+      for (const l of [[-0.24, -0.24], [0.24, -0.24], [-0.24, 0.24], [0.24, 0.24]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.45, 8), mat('#8a5a3a'));
+        leg.position.set(l[0], 0.22, l[1]);
+        ch.add(leg);
+      }
+      const bk = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.62, 0.08), mat('#c98a2f', { roughness: 0.5 }));
+      bk.position.set(0, 0.76, -0.26);
+      ch.add(bk);
+      ch.position.set(s * 2.7, 0, -6.9);
+      ch.rotation.y = s * 0.35;
+      g.add(ch);
+      castle.sits.push({ x: s * 2.7, z: -6.9, ry: s * 0.35 });
     }
     /* treasure chest */
     {
@@ -1030,14 +1050,262 @@ export function createWorld(scene, keyLight) {
       const lock = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.1), mat('#ffd45e', { metalness: 0.7, roughness: 0.3 }));
       lock.position.set(0, 0.55, 0.42);
       c.add(lock);
-      c.position.set(3.6, 0, -3.4);
+      c.position.set(3.8, 0, -7.2);
       c.rotation.y = -0.5;
       g.add(c);
       castle.chest = { group: c, lid, opened: false, anim: 0 };
-      castle.circles.push({ x: 3.6, z: -3.4, r: 0.95 });
+      castle.circles.push({ x: 3.8, z: -7.2, r: 0.95 });
+    }
+    /* ---- east wing: royal apartments ---- */
+    const bedMat = (c) => mat(c, { roughness: 0.6 });
+    function mkBed(x, z, blanket, rotY) {
+      const b = new THREE.Group();
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.32, 1.15), mat('#8a5a3a', { roughness: 0.5 }));
+      frame.position.y = 0.22;
+      b.add(frame);
+      const matt = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.16, 1.0), mat('#fff6ec'));
+      matt.position.y = 0.44;
+      b.add(matt);
+      const bl = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.09, 1.02), bedMat(blanket));
+      bl.position.set(-0.3, 0.55, 0);
+      b.add(bl);
+      const pil = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.8), mat('#fdf0f6'));
+      pil.position.set(0.72, 0.56, 0);
+      b.add(pil);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.85, 1.15), mat('#8a5a3a', { roughness: 0.5 }));
+      head.position.set(1.05, 0.5, 0);
+      b.add(head);
+      b.position.set(x, 0, z);
+      b.rotation.y = rotY || 0;
+      g.add(b);
+      castle.circles.push({ x, z, r: 1.15 });
+      return b;
+    }
+    mkBed(11.1, -5.8, '#63b8f5', -Math.PI / 2);   /* Ken */
+    mkBed(11.1, -3.0, '#b57de0', -Math.PI / 2);   /* Fay */
+    mkBed(11.1, -0.2, '#ff8fb7', -Math.PI / 2);   /* Whitney */
+    mkBed(11.1, 2.6, '#a7d97a', -Math.PI / 2);    /* Bleso */
+    /* royal dining table + chairs */
+    {
+      const table = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.1, 1.15), mat('#a5713f', { roughness: 0.45 }));
+      table.position.set(8.6, 0.72, -3.5);
+      g.add(table);
+      for (const l of [[-1.3, -0.45], [1.3, -0.45], [-1.3, 0.45], [1.3, 0.45]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.72, 8), mat('#8a5a3a'));
+        leg.position.set(8.6 + l[0], 0.36, -3.5 + l[1]);
+        g.add(leg);
+      }
+      castle.boxes.push({ minX: 7.1, maxX: 10.1, minZ: -4.15, maxZ: -2.85 });
+      for (const [cx, cz, ry] of [[7.6, -4.9, 0], [9.6, -4.9, 0], [7.6, -2.1, Math.PI], [9.6, -2.1, Math.PI]]) {
+        const ch = new THREE.Group();
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.09, 0.55), mat('#c98a2f', { roughness: 0.5 }));
+        seat.position.y = 0.45;
+        ch.add(seat);
+        for (const l of [[-0.24, -0.24], [0.24, -0.24], [-0.24, 0.24], [0.24, 0.24]]) {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.45, 8), mat('#8a5a3a'));
+          leg.position.set(l[0], 0.22, l[1]);
+          ch.add(leg);
+        }
+        const bk = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.62, 0.08), mat('#c98a2f', { roughness: 0.5 }));
+        bk.position.set(0, 0.76, -0.26);
+        ch.add(bk);
+        ch.position.set(cx, 0, cz);
+        ch.rotation.y = ry;
+        g.add(ch);
+        castle.sits.push({ x: cx, z: cz, ry });
+      }
+      /* fruit bowl centrepiece */
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.22, 0.2, 14), mat('#ffd45e', { metalness: 0.4, roughness: 0.3 }));
+      bowl.position.set(8.6, 0.88, -3.5);
+      g.add(bowl);
+    }
+    /* bookshelf + globe (Whitney's corner) */
+    {
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.7, 0.42), mat('#8a5a3a', { roughness: 0.55 }));
+      shelf.position.set(10.6, 0.85, -8.1);
+      g.add(shelf);
+      for (let i = 0; i < 6; i++) {
+        const b = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.32, 0.3), mat(['#f45d8e', '#63b8f5', '#a7d97a', '#ffd45e', '#b57de0', '#ff9e4f'][i]));
+        b.position.set(9.8 + (i % 3) * 0.5, 0.6 + Math.floor(i / 3) * 0.62, -8.05);
+        g.add(b);
+      }
+      castle.boxes.push({ minX: 9.6, maxX: 11.6, minZ: -8.4, maxZ: -7.8 });
+      const globe = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 12), mat('#63b8f5', { roughness: 0.3 }));
+      globe.position.set(6.9, 1.05, -7.6);
+      g.add(globe);
+      const gstand = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.16, 0.75, 10), mat('#c98a2f', { metalness: 0.4 }));
+      gstand.position.set(6.9, 0.37, -7.6);
+      g.add(gstand);
+      castle.circles.push({ x: 6.9, z: -7.6, r: 0.5 });
+    }
+    /* vanity (Fay) */
+    {
+      const desk = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.5), mat('#a5713f', { roughness: 0.45 }));
+      desk.position.set(11.6, 0.74, 5.2);
+      g.add(desk);
+      const mirror = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.05, 10, 24), mat('#ffd45e', { metalness: 0.7, roughness: 0.25 }));
+      mirror.position.set(11.7, 1.6, 5.2);
+      mirror.rotation.y = -Math.PI / 2;
+      g.add(mirror);
+      const glass = new THREE.Mesh(new THREE.CircleGeometry(0.38, 20), mat('#dff3ff', { roughness: 0.1, metalness: 0.6 }));
+      glass.position.set(11.66, 1.6, 5.2);
+      glass.rotation.y = -Math.PI / 2;
+      g.add(glass);
+      castle.boxes.push({ minX: 11.0, maxX: 12.2, minZ: 4.9, maxZ: 5.5 });
+      const ch = new THREE.Group();
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.09, 0.5), mat('#f45d8e', { roughness: 0.45 }));
+      seat.position.y = 0.42;
+      ch.add(seat);
+      const bk = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.08), mat('#f45d8e', { roughness: 0.45 }));
+      bk.position.set(0, 0.72, -0.24);
+      ch.add(bk);
+      for (const l of [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.42, 8), mat('#c98a2f'));
+        leg.position.set(l[0], 0.21, l[1]);
+        ch.add(leg);
+      }
+      ch.position.set(10.4, 0, 5.2);
+      ch.rotation.y = Math.PI / 2;
+      g.add(ch);
+      castle.sits.push({ x: 10.4, z: 5.2, ry: Math.PI / 2 });
+    }
+    /* reading chair (Dama) */
+    {
+      const rc = new THREE.Group();
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.14, 0.75), mat('#b57de0', { roughness: 0.7 }));
+      seat.position.y = 0.42;
+      rc.add(seat);
+      const bk = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.9, 0.14), mat('#b57de0', { roughness: 0.7 }));
+      bk.position.set(0, 0.9, -0.32);
+      rc.add(bk);
+      for (const l of [[-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 8), mat('#8a5a3a'));
+        leg.position.set(l[0], 0.2, l[1]);
+        rc.add(leg);
+      }
+      rc.position.set(11.5, 0, 2.9);
+      rc.rotation.y = -2.2;
+      g.add(rc);
+      castle.sits.push({ x: 11.5, z: 2.9, ry: -2.2 });
+      castle.circles.push({ x: 11.5, z: 2.9, r: 0.55 });
+    }
+    /* ---- west wing: your royal chambers ---- */
+    {
+      mkBed(-11.2, -5.6, '#ffd45e', Math.PI / 2);
+      /* candy fountain */
+      const bowlF = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.55, 0.55, 18), mat('#fdf0f6', { roughness: 0.3 }));
+      bowlF.position.set(-8.6, 0.28, -7.6);
+      g.add(bowlF);
+      const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.16, 18), mat('#ff8fb7', { emissive: '#ff6ea5', emissiveIntensity: 0.55, roughness: 0.2 }));
+      liquid.position.set(-8.6, 0.5, -7.6);
+      g.add(liquid);
+      const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.8, 10), mat('#c98a2f', { metalness: 0.5 }));
+      spout.position.set(-8.6, 0.9, -7.6);
+      g.add(spout);
+      castle.circles.push({ x: -8.6, z: -7.6, r: 1.05 });
+      const fLight = new THREE.PointLight('#ff9ec6', 4, 6);
+      fLight.position.set(-8.6, 1.2, -7.6);
+      g.add(fLight);
+      castle.fountain = liquid;
+      /* sofa (two sit spots) */
+      const sofa = new THREE.Group();
+      const sSeat = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.16, 2.3), mat('#f45d8e', { roughness: 0.75 }));
+      sSeat.position.y = 0.42;
+      sofa.add(sSeat);
+      const sBack = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.66, 2.3), mat('#e0457a', { roughness: 0.75 }));
+      sBack.position.set(-0.4, 0.74, 0);
+      sofa.add(sBack);
+      for (const s of [-1, 1]) {
+        const armS = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.24, 0.2), mat('#e0457a', { roughness: 0.75 }));
+        armS.position.set(0, 0.6, s * 1.1);
+        sofa.add(armS);
+      }
+      for (const l of [[-0.35, -1], [0.35, -1], [-0.35, 1], [0.35, 1]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.34, 8), mat('#8a5a3a'));
+        leg.position.set(l[0], 0.17, l[1]);
+        sofa.add(leg);
+      }
+      sofa.position.set(-9.6, 0, 2.8);
+      g.add(sofa);
+      castle.sits.push({ x: -9.5, z: 2.3, ry: Math.PI / 2 });
+      castle.sits.push({ x: -9.5, z: 3.3, ry: Math.PI / 2 });
+      castle.boxes.push({ minX: -10.2, maxX: -9.0, minZ: 1.5, maxZ: 4.1 });
+      /* wardrobe */
+      const ward = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.1, 1.5), mat('#8a5a3a', { roughness: 0.5 }));
+      ward.position.set(-11.9, 1.05, -1.4);
+      g.add(ward);
+      castle.boxes.push({ minX: -12.3, maxX: -11.5, minZ: -2.2, maxZ: -0.6 });
+      /* trophy shelf */
+      const shelf2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 1.8), mat('#8a5a3a', { roughness: 0.5 }));
+      shelf2.position.set(-11.7, 1.15, 5.3);
+      g.add(shelf2);
+      for (let i = 0; i < 3; i++) {
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.05, 0.22, 10), mat('#ffd45e', { metalness: 0.7, roughness: 0.25 }));
+        cup.position.set(-11.7, 1.32, 4.7 + i * 0.6);
+        g.add(cup);
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), mat('#ffd45e', { metalness: 0.7, roughness: 0.25 }));
+        ball.position.set(-11.7, 1.5, 4.7 + i * 0.6);
+        g.add(ball);
+      }
+      castle.boxes.push({ minX: -12.0, maxX: -11.4, minZ: 4.3, maxZ: 6.3 });
+      /* pet bed */
+      const petBed = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.13, 10, 20), mat('#ff9ec6', { roughness: 0.6 }));
+      petBed.rotation.x = Math.PI / 2;
+      petBed.position.set(-10.6, 0.12, -3.0);
+      g.add(petBed);
+      const cushion = new THREE.Mesh(new THREE.CircleGeometry(0.32, 16), mat('#ffd7e8', { roughness: 0.8 }));
+      cushion.rotation.x = -Math.PI / 2;
+      cushion.position.set(-10.6, 0.05, -3.0);
+      g.add(cushion);
+      /* royal desk + chair */
+      const desk2 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 0.65), mat('#a5713f', { roughness: 0.45 }));
+      desk2.position.set(-7.4, 0.74, 6.9);
+      g.add(desk2);
+      for (const l of [[-0.55, -0.24], [0.55, -0.24], [-0.55, 0.24], [0.55, 0.24]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.72, 8), mat('#8a5a3a'));
+        leg.position.set(-7.4 + l[0], 0.36, 6.9 + l[1]);
+        g.add(leg);
+      }
+      castle.boxes.push({ minX: -8.1, maxX: -6.7, minZ: 6.5, maxZ: 7.3 });
+      const ch2 = new THREE.Group();
+      const seat2 = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.09, 0.52), mat('#ffd45e', { roughness: 0.45 }));
+      seat2.position.y = 0.45;
+      ch2.add(seat2);
+      const bk2 = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.6, 0.08), mat('#ffd45e', { roughness: 0.45 }));
+      bk2.position.set(0, 0.76, -0.24);
+      ch2.add(bk2);
+      for (const l of [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.45, 8), mat('#8a5a3a'));
+        leg.position.set(l[0], 0.22, l[1]);
+        ch2.add(leg);
+      }
+      ch2.position.set(-7.4, 0, 6.0);
+      ch2.rotation.y = 0;
+      g.add(ch2);
+      castle.sits.push({ x: -7.4, z: 6.0, ry: 0 });
+      /* crest banner on the west wall */
+      const bannerTex = canvasTex(128, 256, (ctx, w, h) => {
+        const gr = ctx.createLinearGradient(0, 0, 0, h);
+        gr.addColorStop(0, '#f45d8e');
+        gr.addColorStop(1, '#ffd45e');
+        ctx.fillStyle = gr;
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#fff6ec';
+        ctx.font = 'bold 96px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('\u2726', w / 2, h / 2 - 20);
+        ctx.font = 'bold 56px serif';
+        ctx.fillText('\u2694', w / 2, h / 2 + 60);
+      });
+      const banner = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 3.2),
+        new THREE.MeshStandardMaterial({ map: bannerTex, roughness: 0.8 }));
+      banner.position.set(-W / 2 + 0.06, 2.6, 0);
+      banner.rotation.y = Math.PI / 2;
+      g.add(banner);
     }
     /* chandeliers */
-    for (const [cx, cz] of [[-3, -1], [3, -1], [0, 2]]) {
+    for (const [cx, cz] of [[-6, -3], [6, -3], [0, -1], [-8, 3], [8, 3]]) {
       const ch = new THREE.Group();
       const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.0, 6), mat('#c98a2f'));
       chain.position.y = H - 0.5;
@@ -1054,11 +1322,336 @@ export function createWorld(scene, keyLight) {
       g.add(ch);
       castle.chandeliers.push(ch);
     }
-    /* interior light */
-    const inLight = new THREE.PointLight('#ffe3c4', 18, 18);
-    inLight.position.set(0, 3.6, 0);
+    /* interior lights */
+    const inLight = new THREE.PointLight('#ffe3c4', 18, 22);
+    inLight.position.set(0, 3.8, -2);
     g.add(inLight);
+    const eastLight = new THREE.PointLight('#ffe3c4', 6, 12);
+    eastLight.position.set(9, 3.4, 2);
+    g.add(eastLight);
+    const westLight = new THREE.PointLight('#ffe3c4', 6, 12);
+    westLight.position.set(-9, 3.4, 2);
+    g.add(westLight);
   }
+
+  /* ---------------- NPC homes (enterable cottages) ---------------- */
+  const homes = [];
+  function buildHome(def) {
+    const { id, x, z, wall, roof, blanket, theme } = def;
+    /* --- exterior --- */
+    const ext = new THREE.Group();
+    ext.position.set(x, 0, z);
+    const ry = Math.atan2(-x, 21 - z);
+    ext.rotation.y = ry;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.6, 3.4), mat(wall, { roughness: 0.55 }));
+    body.position.y = 1.3;
+    body.castShadow = true;
+    ext.add(body);
+    const roofM = new THREE.Mesh(new THREE.ConeGeometry(3.3, 1.7, 4), mat(roof, { roughness: 0.45 }));
+    roofM.position.y = 3.35;
+    roofM.rotation.y = Math.PI / 4;
+    roofM.castShadow = true;
+    ext.add(roofM);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.7, 0.14), mat('#8a5a3a', { roughness: 0.5 }));
+    door.position.set(0, 0.85, 1.73);
+    ext.add(door);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), mat('#ffd45e', { metalness: 0.6 }));
+    knob.position.set(0.32, 0.85, 1.82);
+    ext.add(knob);
+    for (const s of [-1, 1]) {
+      const win = new THREE.Mesh(new THREE.CircleGeometry(0.34, 16), new THREE.MeshStandardMaterial({ color: '#fff3b8', emissive: '#ffd45e', emissiveIntensity: 0.4 }));
+      win.position.set(s * 1.15, 1.5, 1.715);
+      ext.add(win);
+      const frame = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.045, 8, 18), mat('#fff6ec'));
+      frame.position.copy(win.position);
+      ext.add(frame);
+    }
+    const chim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.1, 0.5), mat('#fdf0f6', { roughness: 0.6 }));
+    chim.position.set(1.2, 3.4, -0.8);
+    ext.add(chim);
+    group.add(ext);
+    circles.push({ x, z, r: 2.45 });
+    const doorX = x + Math.sin(ry) * 2.2;
+    const doorZ = z + Math.cos(ry) * 2.2;
+    /* --- interior --- */
+    const ig = new THREE.Group();
+    ig.visible = false;
+    scene.add(ig);
+    const IW = 8, ID = 6, IH = 3;
+    const boxes = [], circles2 = [], sits = [];
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(IW, ID), mat('#e8d3bd', { roughness: 0.7 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    ig.add(floor);
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.8), mat(theme.rug, { roughness: 0.85 }));
+    rug.rotation.x = -Math.PI / 2;
+    rug.position.set(0, 0.012, 0.3);
+    ig.add(rug);
+    const wallMat = new THREE.MeshStandardMaterial({ color: theme.wall, roughness: 0.8, side: THREE.DoubleSide });
+    const mkW = (w, h, px, py, pz, rotY) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat);
+      m.position.set(px, py, pz);
+      m.rotation.y = rotY;
+      ig.add(m);
+    };
+    mkW(IW, IH, 0, IH / 2, -ID / 2, 0);
+    mkW(ID, IH, -IW / 2, IH / 2, 0, Math.PI / 2);
+    mkW(ID, IH, IW / 2, IH / 2, 0, -Math.PI / 2);
+    mkW(IW / 2 - 0.9, IH, -(IW / 4 + 0.45), IH / 2, ID / 2, Math.PI);
+    mkW(IW / 2 - 0.9, IH, (IW / 4 + 0.45), IH / 2, ID / 2, Math.PI);
+    boxes.push({ minX: -IW / 2 - 0.3, maxX: -IW / 2 + 0.3, minZ: -ID / 2, maxZ: ID / 2 });
+    boxes.push({ minX: IW / 2 - 0.3, maxX: IW / 2 + 0.3, minZ: -ID / 2, maxZ: ID / 2 });
+    boxes.push({ minX: -IW / 2, maxX: IW / 2, minZ: -ID / 2 - 0.3, maxZ: -ID / 2 + 0.3 });
+    boxes.push({ minX: -IW / 2, maxX: -0.9, minZ: ID / 2 - 0.3, maxZ: ID / 2 + 0.3 });
+    boxes.push({ minX: 0.9, maxX: IW / 2, minZ: ID / 2 - 0.3, maxZ: ID / 2 + 0.3 });
+    /* windows (glowing) */
+    for (const s of [-1, 1]) {
+      const win = new THREE.Mesh(new THREE.CircleGeometry(0.42, 16), new THREE.MeshStandardMaterial({ color: '#fff3b8', emissive: '#ffd45e', emissiveIntensity: 0.35 }));
+      win.position.set(s * (IW / 2 - 0.06), 1.7, -0.8);
+      win.rotation.y = s * -Math.PI / 2;
+      ig.add(win);
+    }
+    /* bed */
+    {
+      const b = new THREE.Group();
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.3, 1.15), mat('#8a5a3a', { roughness: 0.5 }));
+      frame.position.y = 0.2;
+      b.add(frame);
+      const matt = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.16, 1.0), mat('#fff6ec'));
+      matt.position.y = 0.42;
+      b.add(matt);
+      const bl = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.09, 1.02), mat(blanket, { roughness: 0.6 }));
+      bl.position.set(-0.3, 0.53, 0);
+      b.add(bl);
+      const pil = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.8), mat('#fdf0f6'));
+      pil.position.set(0.72, 0.54, 0);
+      b.add(pil);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.8, 1.15), mat('#8a5a3a', { roughness: 0.5 }));
+      head.position.set(1.05, 0.5, 0);
+      b.add(head);
+      b.position.set(-2.6, 0, -1.5);
+      b.rotation.y = Math.PI / 2;
+      ig.add(b);
+      circles2.push({ x: -2.6, z: -1.5, r: 1.1 });
+    }
+    /* table + two chairs (sit spots) */
+    {
+      const table = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.09, 1.15), mat('#a5713f', { roughness: 0.45 }));
+      table.position.set(1.5, 0.72, -1.2);
+      ig.add(table);
+      for (const l of [[-0.48, -0.48], [0.48, -0.48], [-0.48, 0.48], [0.48, 0.48]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 8), mat('#8a5a3a'));
+        leg.position.set(1.5 + l[0], 0.35, -1.2 + l[1]);
+        ig.add(leg);
+      }
+      boxes.push({ minX: 0.9, maxX: 2.1, minZ: -1.8, maxZ: -0.6 });
+      for (const [cx, ry2] of [[0.25, Math.PI / 2], [2.75, -Math.PI / 2]]) {
+        const ch = new THREE.Group();
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.5), mat('#c98a2f', { roughness: 0.5 }));
+        seat.position.y = 0.42;
+        ch.add(seat);
+        const bk = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.58, 0.07), mat('#c98a2f', { roughness: 0.5 }));
+        bk.position.set(0, 0.7, -0.22);
+        ch.add(bk);
+        for (const l of [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]]) {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.42, 8), mat('#8a5a3a'));
+          leg.position.set(l[0], 0.21, l[1]);
+          ch.add(leg);
+        }
+        ch.position.set(cx, 0, -1.2);
+        ch.rotation.y = ry2;
+        ig.add(ch);
+        sits.push({ x: cx, z: -1.2, ry: ry2 });
+      }
+    }
+    /* theme prop on the north wall */
+    theme.prop(ig, mat, THREE, boxes, circles2);
+    /* lamp */
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.2, 6), mat('#c98a2f', { metalness: 0.4 }));
+    lamp.position.set(0, 2.1, -2.7);
+    ig.add(lamp);
+    const shade = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.3, 12, 1, true), mat('#fff3b8', { emissive: '#ffd45e', emissiveIntensity: 0.5 }));
+    shade.position.set(0, 2.75, -2.7);
+    ig.add(shade);
+    const light = new THREE.PointLight('#ffe3c4', 5, 10);
+    light.position.set(0, 2.6, -1.2);
+    ig.add(light);
+    return {
+      id, npc: id,
+      pos: new THREE.Vector3(x, 0, z),
+      door: new THREE.Vector3(doorX, 0, doorZ),
+      exit: new THREE.Vector3(x + Math.sin(ry) * 2.9, 0, z + Math.cos(ry) * 2.9),
+      interior: { group: ig, boxes, circles: circles2, sits,
+        bounds: { minX: -IW / 2 + 0.7, maxX: IW / 2 - 0.7, minZ: -ID / 2 + 0.7, maxZ: ID / 2 - 0.8 } },
+      npcSpot: new THREE.Vector3(1.6, 0, 1.4),
+    };
+  }
+  const HOME_DEFS = [
+    { id: 'zuri', x: 22.5, z: 14, wall: '#c8ecc0', roof: '#4fc3ae', blanket: '#a7d97a',
+      theme: { wall: '#e5f6e0', rug: '#a7d97a', prop(ig, mat, T, boxes, circles) {
+        for (const [px, pz, s] of [[3.1, -1.8, 1], [2.6, -2.2, 0.75]]) {
+          const pot = new T.Mesh(new T.CylinderGeometry(0.16, 0.12, 0.26, 10), mat('#a5713f'));
+          pot.position.set(px, 0.13, pz);
+          ig.add(pot);
+          const leaf = new T.Mesh(new T.ConeGeometry(0.24 * s, 0.7 * s, 8), mat('#4fc3ae'));
+          leaf.position.set(px, 0.55 * s, pz);
+          ig.add(leaf);
+          circles.push({ x: px, z: pz, r: 0.3 });
+        }
+      } } },
+    { id: 'theo', x: 24, z: 18.5, wall: '#fdf0d5', roof: '#c98a2f', blanket: '#ffd45e',
+      theme: { wall: '#fbf0dc', rug: '#c98a2f', prop(ig, mat, T, boxes, circles) {
+        const shelf = new T.Mesh(new T.BoxGeometry(1.5, 1.3, 0.34), mat('#8a5a3a'));
+        shelf.position.set(0, 0.65, -2.7);
+        ig.add(shelf);
+        for (let i = 0; i < 5; i++) {
+          const b = new T.Mesh(new T.BoxGeometry(0.13, 0.3, 0.24), mat(['#f45d8e', '#63b8f5', '#a7d97a', '#ffd45e', '#b57de0'][i]));
+          b.position.set(-0.55 + i * 0.27, 0.68 + (i % 2) * 0.5, -2.66);
+          ig.add(b);
+        }
+        boxes.push({ minX: -0.8, maxX: 0.8, minZ: -2.9, maxZ: -2.5 });
+      } } },
+    { id: 'amani', x: 24.5, z: 25, wall: '#d9e8f7', roof: '#8f6fd3', blanket: '#63b8f5',
+      theme: { wall: '#e3edf8', rug: '#63b8f5', prop(ig, mat, T, boxes, circles) {
+        const globe = new T.Mesh(new T.SphereGeometry(0.33, 16, 12), mat('#63b8f5', { roughness: 0.3 }));
+        globe.position.set(2.9, 1.0, -2.2);
+        ig.add(globe);
+        const stand = new T.Mesh(new T.CylinderGeometry(0.06, 0.15, 0.7, 10), mat('#c98a2f', { metalness: 0.4 }));
+        stand.position.set(2.9, 0.35, -2.2);
+        ig.add(stand);
+        circles.push({ x: 2.9, z: -2.2, r: 0.42 });
+        const map = new T.Mesh(new T.BoxGeometry(0.9, 0.65, 0.05), mat('#fdf0d5'));
+        map.position.set(0.6, 1.7, -2.85);
+        ig.add(map);
+      } } },
+    { id: 'momo', x: 12, z: 24.5, wall: '#e8d3bd', roof: '#ff9e4f', blanket: '#8a5a3a',
+      theme: { wall: '#f0e0d0', rug: '#ff9e4f', prop(ig, mat, T, boxes, circles) {
+        const counter = new T.Mesh(new T.BoxGeometry(1.5, 0.85, 0.55), mat('#a5713f', { roughness: 0.45 }));
+        counter.position.set(2.7, 0.42, -2.3);
+        ig.add(counter);
+        const pot = new T.Mesh(new T.CylinderGeometry(0.2, 0.24, 0.34, 12), mat('#8a5a3a'));
+        pot.position.set(2.7, 1.0, -2.3);
+        ig.add(pot);
+        const coca = new T.Mesh(new T.SphereGeometry(0.19, 12, 10), mat('#5a3a25', { roughness: 0.25 }));
+        coca.position.set(2.7, 1.2, -2.3);
+        ig.add(coca);
+        boxes.push({ minX: 1.95, maxX: 3.45, minZ: -2.6, maxZ: -2.0 });
+      } } },
+    { id: 'lulu', x: -9, z: 25.5, wall: '#eadcf7', roof: '#8f6fd3', blanket: '#b57de0',
+      theme: { wall: '#f0e6fb', rug: '#b57de0', prop(ig, mat, T, boxes, circles) {
+        const starMat = new T.MeshStandardMaterial({ color: '#ffd45e', emissive: '#ffd45e', emissiveIntensity: 0.7 });
+        for (let i = 0; i < 5; i++) {
+          const st = new T.Mesh(new T.OctahedronGeometry(0.09), starMat);
+          st.position.set(-1.4 + i * 0.7, 2.2 + Math.sin(i * 1.3) * 0.2, -2.4);
+          ig.add(st);
+        }
+        const moon = new T.Mesh(new T.TorusGeometry(0.18, 0.045, 10, 18, Math.PI), mat('#fff3b8', { emissive: '#fff3b8', emissiveIntensity: 0.4 }));
+        moon.position.set(0.2, 2.35, -2.4);
+        ig.add(moon);
+      } } },
+    { id: 'kiki', x: -24, z: 15, wall: '#fff3d6', roof: '#ff8fb7', blanket: '#ffd45e',
+      theme: { wall: '#fff8e8', rug: '#ff8fb7', prop(ig, mat, T, boxes, circles) {
+        const desk = new T.Mesh(new T.BoxGeometry(1.0, 0.08, 0.5), mat('#a5713f'));
+        desk.position.set(2.6, 0.75, -2.2);
+        ig.add(desk);
+        const mirror = new T.Mesh(new T.TorusGeometry(0.36, 0.045, 10, 22), mat('#ffd45e', { metalness: 0.7 }));
+        mirror.position.set(2.6, 1.55, -2.6);
+        ig.add(mirror);
+        const glass = new T.Mesh(new T.CircleGeometry(0.32, 18), mat('#dff3ff', { roughness: 0.1, metalness: 0.5 }));
+        glass.position.set(2.6, 1.55, -2.55);
+        ig.add(glass);
+        boxes.push({ minX: 2.1, maxX: 3.1, minZ: -2.5, maxZ: -1.9 });
+      } } },
+    { id: 'dex', x: -24.5, z: 21, wall: '#fffbe8', roof: '#ffd45e', blanket: '#fff3f6',
+      theme: { wall: '#fffdf2', rug: '#ffd45e', prop(ig, mat, T, boxes, circles) {
+        for (let i = 0; i < 3; i++) {
+          const cup = new T.Mesh(new T.CylinderGeometry(0.09, 0.05, 0.2, 10), mat('#ffd45e', { metalness: 0.7 }));
+          cup.position.set(2.8, 0.9 + i * 0.02, -2.3 + i * 0.0 - 0.6 + i * 0.6);
+          cup.position.set(2.8, 0.9, -2.5 + i * 0.6);
+          ig.add(cup);
+          const ball = new T.Mesh(new T.SphereGeometry(0.055, 10, 8), mat('#ffd45e', { metalness: 0.7 }));
+          ball.position.set(2.8, 1.08, -2.5 + i * 0.6);
+          ig.add(ball);
+          const shelf = new T.Mesh(new T.BoxGeometry(0.36, 0.07, 0.7), mat('#8a5a3a'));
+          shelf.position.set(2.8, 0.78, -2.5 + i * 0.6);
+          ig.add(shelf);
+        }
+      } } },
+  ];
+  for (const d of HOME_DEFS) homes.push(buildHome(d));
+
+  /* ---------------- arcade stands (mini-games) ---------------- */
+  const arcades = [];
+  {
+    /* candy catch kiosk */
+    {
+      const g = new THREE.Group();
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.7, 0.9), mat('#f45d8e', { roughness: 0.4 }));
+      base.position.y = 0.85;
+      base.castShadow = true;
+      g.add(base);
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.6), new THREE.MeshStandardMaterial({ color: '#b8f3ff', emissive: '#63e0f5', emissiveIntensity: 0.8 }));
+      screen.position.set(0, 1.25, 0.46);
+      g.add(screen);
+      const awn = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.18, 8, 1, false, 0, Math.PI), new THREE.MeshStandardMaterial({ map: stripes, roughness: 0.5 }));
+      awn.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+      awn.position.set(0, 1.9, 0.25);
+      g.add(awn);
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), mat('#fff6ec'));
+      stem.position.set(0, 2.3, 0);
+      g.add(stem);
+      const lolli = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.13, 10, 22), new THREE.MeshStandardMaterial({ color: '#ff8fb7', roughness: 0.3 }));
+      lolli.position.set(0, 2.95, 0);
+      g.add(lolli);
+      g.position.set(7, 0, 15.5);
+      g.rotation.y = -0.6;
+      group.add(g);
+      circles.push({ x: 7, z: 15.5, r: 1.3 });
+      arcades.push({ id: 'catch', label: 'Candy Catch', pos: new THREE.Vector3(7, 0, 15.5) });
+    }
+    /* gummy rush kiosk (checkered) */
+    {
+      const checkTex = canvasTex(64, 64, (ctx, w, h) => {
+        for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) {
+          ctx.fillStyle = (x + y) % 2 ? '#333' : '#fff';
+          ctx.fillRect(x * 32, y * 32, 32, 32);
+        }
+      }, 2, 2);
+      const g = new THREE.Group();
+      const base = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.7, 0.9), mat('#63b8f5', { roughness: 0.4 }));
+      base.position.y = 0.85;
+      base.castShadow = true;
+      g.add(base);
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.6), new THREE.MeshStandardMaterial({ map: checkTex, emissive: '#ffffff', emissiveIntensity: 0.25 }));
+      screen.position.set(0, 1.25, 0.46);
+      g.add(screen);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.6, 8), mat('#fdf0f6'));
+      pole.position.set(0.4, 1.3, 0);
+      g.add(pole);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.55), new THREE.MeshStandardMaterial({ map: checkTex, side: THREE.DoubleSide, roughness: 0.6 }));
+      flag.position.set(0.85, 2.4, 0);
+      g.add(flag);
+      g.position.set(-16, 0, 22.5);
+      g.rotation.y = 2.6;
+      group.add(g);
+      circles.push({ x: -16, z: 22.5, r: 1.3 });
+      arcades.push({ id: 'race', label: 'Gummy Rush', pos: new THREE.Vector3(-16, 0, 22.5) });
+    }
+  }
+
+  /* ---------------- gummy rush race rings ---------------- */
+  const racePath = [
+    [-13, 25], [14, 20], [0, 32], [38, -20], [0, -38], [-27, -11],
+  ].map(([x, z]) => new THREE.Vector3(x, 0, z));
+  const raceRings = racePath.map((p) => {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.7, 0.17, 10, 28),
+      new THREE.MeshStandardMaterial({ color: '#ffd45e', emissive: '#ffb84e', emissiveIntensity: 0.55, roughness: 0.3, metalness: 0.3 }));
+    ring.position.set(p.x, 1.45, p.z);
+    ring.visible = false;
+    group.add(ring);
+    return ring;
+  });
 
   /* ---------------- api ---------------- */
   return {
@@ -1066,6 +1659,7 @@ export function createWorld(scene, keyLight) {
     gem, butterflies,
     candies, goldenBear,
     castle, setBeacon,
+    homes, arcades, raceRings, racePath,
     castlePos: new THREE.Vector3(0, 0, -43),
     castleDoor: new THREE.Vector3(0, 0, -42.6),
     donuts: [new THREE.Vector3(-18, 0, 32), new THREE.Vector3(0, 0, 32), new THREE.Vector3(18, 0, 32)],
@@ -1117,6 +1711,10 @@ export function createWorld(scene, keyLight) {
       if (castle.group.visible) {
         for (const ch of castle.chandeliers) {
           ch.rotation.z = Math.sin(t * 0.9 + ch.userData.phase) * 0.06;
+        }
+        if (castle.fountain) {
+          castle.fountain.position.y = 0.5 + Math.sin(t * 3) * 0.04;
+          castle.fountain.material.emissiveIntensity = 0.5 + Math.sin(t * 5) * 0.15;
         }
         if (castle.chest.anim > 0) {
           castle.chest.anim = Math.max(0, castle.chest.anim - dt * 1.8);
