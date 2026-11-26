@@ -4,7 +4,8 @@
    ===================================================================== */
 import * as THREE from 'three';
 import { createDoll, SKINS, HAIRC, CLOTH, EYES, SHOEC,
-         HAIRSTYLES, OUTFITS, SHOESTYLES, ACCESSORIES } from './doll.js';
+         HAIRSTYLES, OUTFITS, SHOESTYLES, ACCESSORIES,
+         MALE_HAIRSTYLES, MALE_OUTFITS, MALE_ACCESSORIES } from './doll.js';
 import { createWorld } from './world.js';
 import { createEffects } from './effects.js';
 import { Beatbox } from './audio.js';
@@ -53,11 +54,38 @@ const CHARACTERS = [
   {
     id: 'kiki', emoji: '💫', name: 'Kiki', title: 'Vanilla Comet',
     blurb: 'The fastest doll in Candy World — catch her if you can!',
-    speed: 6.5, jump: 5.6,
+    speed: 6.5, jump: 5.6, gender: 'female',
     cfg: { hair: 'short', hairColor: '#e8c268', skin: '#f9ddc4', eyes: '#8a5a3c',
       outfit: 'party', top: '#fff3f6', skirt: '#ffd45e',
       shoes: 'boots', shoeColor: '#d9a441',
       accessories: { crown: true, bow: true, glasses: false, necklace: false, earrings: true } },
+  },
+  {
+    id: 'theo', emoji: '🤴', name: 'Theo', title: 'Cocoa Prince',
+    blurb: 'Bold and gallant — claims the candy castle is his by right.',
+    speed: 5.4, jump: 4.8, gender: 'male',
+    cfg: { hair: 'quiff', hairColor: '#3a2a1e', skin: '#8d5524', eyes: '#5a3420',
+      outfit: 'mprince', top: '#ffd45e', skirt: '#63b8f5',
+      shoes: 'boots', shoeColor: '#33304a',
+      accessories: { crown: true, bow: true, glasses: false } },
+  },
+  {
+    id: 'amani', emoji: '🍀', name: 'Amani', title: 'Mint Explorer',
+    blurb: 'Charts every trail from the rainbow to the ice cream peaks.',
+    speed: 5.1, jump: 5.2, gender: 'male',
+    cfg: { hair: 'curly', hairColor: '#1a1410', skin: '#dda273', eyes: '#3f7d4e',
+      outfit: 'explorer', top: '#a7d97a', skirt: '#4fc3ae',
+      shoes: 'boots', shoeColor: '#33304a',
+      accessories: { crown: false, bow: false, glasses: true } },
+  },
+  {
+    id: 'dex', emoji: '⚡', name: 'Dex', title: 'Lemon Bolt',
+    blurb: 'Fastest boy in the world — a yellow blur through the meadow.',
+    speed: 6.4, jump: 5.5, gender: 'male',
+    cfg: { hair: 'sidepart', hairColor: '#e8c268', skin: '#f9ddc4', eyes: '#2f6d8f',
+      outfit: 'sporty', top: '#ffd45e', skirt: '#fff3f6',
+      shoes: 'flats', shoeColor: '#d9a441',
+      accessories: { crown: false, bow: false, glasses: false } },
   },
 ];
 
@@ -81,7 +109,8 @@ function save() {
 }
 function cfgFor(id) {
   const ch = CHARACTERS.find((c) => c.id === id);
-  return { ...ch.cfg, accessories: { ...ch.cfg.accessories }, ...(state.cfgs[id] || {}),
+  return { ...ch.cfg, ...(state.cfgs[id] || {}),
+           gender: ch.gender,
            accessories: { ...ch.cfg.accessories, ...((state.cfgs[id] || {}).accessories || {}) } };
 }
 
@@ -243,30 +272,48 @@ function rebuildPlayer(id) {
     player.group.position.y = 0.01;
   }
   state.character = id;
+  rebuildNpcs();
+  buildWardrobePanel();
+  updateHud();
   save();
 }
 
 /* ------------------------------------------------------------------ */
-/* NPC dolls wandering the world                                       */
+/* NPC dolls wandering the world — every character except the player   */
 /* ------------------------------------------------------------------ */
-const NPC_IDS = ['momo', 'zuri', 'lulu'];
-const npcs = NPC_IDS.map((id, i) => {
-  const ch = CHARACTERS.find((c) => c.id === id);
-  const doll = createDoll(cfgFor(id));
-  const a = (i / NPC_IDS.length) * Math.PI * 2 + 0.6;
-  const p = new THREE.Vector3(Math.cos(a) * 26, 0, Math.sin(a) * 20 - 4);
-  doll.group.position.copy(p);
-  doll.group.rotation.y = Math.random() * Math.PI * 2;
-  world.group.add(doll.group);
-  return {
-    doll, ch,
-    state: 'idle',
-    timer: 1 + Math.random() * 3,
-    target: p.clone(),
-    speed: 2.2 + Math.random() * 1.2,
-    waveTimer: 0,
-  };
-});
+let npcs = [];
+function rebuildNpcs() {
+  for (const n of npcs) {
+    n.doll.dispose();
+    world.group.remove(n.doll.group);
+  }
+  npcs = [];
+  const others = CHARACTERS.filter((c) => c.id !== currentChar.id);
+  others.forEach((ch, i) => {
+    const doll = createDoll(cfgFor(ch.id));
+    let p = null;
+    for (let k = 0; k < 30 && !p; k++) {
+      const a = (i / others.length) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
+      const r = 24 + Math.random() * 8;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (Math.abs(x) < 22.5 && Math.abs(z) < 22.5) continue;   /* off the maze island */
+      if (z > 27 && z < 37) continue;                             /* off the river */
+      p = new THREE.Vector3(x, 0, z);
+    }
+    if (!p) p = new THREE.Vector3(24, 0, 24);
+    doll.group.position.copy(p);
+    doll.group.rotation.y = Math.random() * Math.PI * 2;
+    world.group.add(doll.group);
+    npcs.push({
+      doll, ch,
+      state: 'idle',
+      timer: 1 + Math.random() * 3,
+      target: p.clone(),
+      speed: 2.2 + Math.random() * 1.2,
+      waveTimer: 0.5 + Math.random() * 3,
+    });
+  });
+}
 function pickNpcTarget(n) {
   for (let k = 0; k < 20; k++) {
     const a = Math.random() * Math.PI * 2;
@@ -359,8 +406,10 @@ function syncCharChips() {
 syncCharChips();
 renderCharInfo();
 
-/* ---------------- wardrobe panel (studio) ---------------- */
+/* ---------------- wardrobe panel (studio, gender-aware) ---------------- */
 const uiSync = [];
+let TABS = [];
+let activeTab = 'hair';
 function el(tag, cls, html) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -401,47 +450,58 @@ function persistCfg() {
   state.cfgs[currentChar.id] = JSON.parse(JSON.stringify(player.cfg));
   save();
 }
-const TABS = [
-  { id: 'hair', label: '💈 Hair', build: () => container(
-      groupLabel('Style'), chips(HAIRSTYLES, () => player.cfg.hair, (v) => { player.cfg.hair = v; player.buildHair(); persistCfg(); }),
-      groupLabel('Color'), swatches(HAIRC, () => player.cfg.hairColor, (v) => { player.cfg.hairColor = v; player.mats.hairMat.color.set(v); persistCfg(); })) },
-  { id: 'outfit', label: '👗 Outfit', build: () => container(
-      groupLabel('Style'), chips(OUTFITS, () => player.cfg.outfit, (v) => { player.cfg.outfit = v; player.buildSkirt(); persistCfg(); }),
-      groupLabel('Top'), swatches(CLOTH, () => player.cfg.top, (v) => { player.cfg.top = v; player.mats.topMat.color.set(v); persistCfg(); }),
-      groupLabel('Skirt &amp; accents'), swatches(CLOTH, () => player.cfg.skirt, (v) => { player.cfg.skirt = v; player.mats.skirtMat.color.set(v); player.mats.accentMat.color.set(v); persistCfg(); })) },
-  { id: 'beauty', label: '💄 Beauty', build: () => container(
-      groupLabel('Skin tone'), swatches(SKINS, () => player.cfg.skin, (v) => { player.cfg.skin = v; player.mats.skinMat.color.set(v); persistCfg(); }),
-      groupLabel('Eyes'), swatches(EYES, () => player.cfg.eyes, (v) => { player.cfg.eyes = v; player.mats.pupilMat.color.set(v); persistCfg(); })) },
-  { id: 'shoes', label: '👠 Shoes', build: () => container(
-      groupLabel('Style'), chips(SHOESTYLES, () => player.cfg.shoes, (v) => { player.cfg.shoes = v; player.buildShoes(); persistCfg(); }),
-      groupLabel('Color'), swatches(SHOEC, () => player.cfg.shoeColor, (v) => { player.cfg.shoeColor = v; player.mats.shoeMat.color.set(v); persistCfg(); })) },
-  { id: 'extras', label: '✨ Extras', build: () => {
-      const chipsWrap = el('div', 'chips');
-      const btns = ACCESSORIES.map((a) => {
-        const b = el('button', 'chip', a.label);
-        b.addEventListener('click', () => { player.setAccessory(a.id, !player.cfg.accessories[a.id]); persistCfg(); syncUI(); });
-        chipsWrap.appendChild(b);
-        return { b, id: a.id };
-      });
-      uiSync.push(() => { for (const { b, id } of btns) b.classList.toggle('on', !!player.cfg.accessories[id]); });
-      return container(groupLabel('Accessories'), chipsWrap);
-    } },
-];
-const tabsBar = el('div', '', '');
-tabsBar.id = 'tabs';
-panelEl.appendChild(tabsBar);
-let activeTab = 'hair';
-for (const t of TABS) {
-  const btn = el('button', 'tab', t.label);
-  btn.addEventListener('click', () => { activeTab = t.id; syncUI(); });
-  btn.dataset.tab = t.id;
-  tabsBar.appendChild(btn);
-  const pane = t.build();
-  pane.className = 'tabpane';
-  pane.dataset.pane = t.id;
-  panelEl.appendChild(pane);
-  t.pane = pane;
-  t.btn = btn;
+function buildWardrobePanel() {
+  uiSync.length = 0;
+  TABS = [];
+  panelEl.innerHTML = '';
+  const male = !!player.male;
+  const hairstyles = male ? MALE_HAIRSTYLES : HAIRSTYLES;
+  const outfits = male ? MALE_OUTFITS : OUTFITS;
+  const accList = male ? MALE_ACCESSORIES : ACCESSORIES;
+  const bottomLabel = male ? 'Trousers' : 'Skirt &amp; accents';
+  TABS = [
+    { id: 'hair', label: male ? '💈 Hair' : '💈 Hair', build: () => container(
+        groupLabel('Style'), chips(hairstyles, () => player.cfg.hair, (v) => { player.cfg.hair = v; player.buildHair(); persistCfg(); }),
+        groupLabel('Color'), swatches(HAIRC, () => player.cfg.hairColor, (v) => { player.cfg.hairColor = v; player.mats.hairMat.color.set(v); persistCfg(); })) },
+    { id: 'outfit', label: male ? '🤴 Outfit' : '👗 Outfit', build: () => container(
+        groupLabel('Style'), chips(outfits, () => player.cfg.outfit, (v) => { player.cfg.outfit = v; player.buildBottom(); persistCfg(); }),
+        groupLabel('Top'), swatches(CLOTH, () => player.cfg.top, (v) => { player.cfg.top = v; player.mats.topMat.color.set(v); persistCfg(); }),
+        groupLabel(bottomLabel), swatches(CLOTH, () => player.cfg.skirt, (v) => { player.cfg.skirt = v; player.mats.skirtMat.color.set(v); player.mats.accentMat.color.set(v); persistCfg(); })) },
+    { id: 'beauty', label: '💄 Beauty', build: () => container(
+        groupLabel('Skin tone'), swatches(SKINS, () => player.cfg.skin, (v) => { player.cfg.skin = v; player.mats.skinMat.color.set(v); persistCfg(); }),
+        groupLabel('Eyes'), swatches(EYES, () => player.cfg.eyes, (v) => { player.cfg.eyes = v; player.mats.pupilMat.color.set(v); persistCfg(); })) },
+    { id: 'shoes', label: '👟 Shoes', build: () => container(
+        groupLabel('Style'), chips(SHOESTYLES, () => player.cfg.shoes, (v) => { player.cfg.shoes = v; player.buildShoes(); persistCfg(); }),
+        groupLabel('Color'), swatches(SHOEC, () => player.cfg.shoeColor, (v) => { player.cfg.shoeColor = v; player.mats.shoeMat.color.set(v); persistCfg(); })) },
+    { id: 'extras', label: '✨ Extras', build: () => {
+        const chipsWrap = el('div', 'chips');
+        const btns = accList.map((a) => {
+          const b = el('button', 'chip', a.label);
+          b.addEventListener('click', () => { player.setAccessory(a.id, !player.cfg.accessories[a.id]); persistCfg(); syncUI(); });
+          chipsWrap.appendChild(b);
+          return { b, id: a.id };
+        });
+        uiSync.push(() => { for (const { b, id } of btns) b.classList.toggle('on', !!player.cfg.accessories[id]); });
+        return container(groupLabel('Accessories'), chipsWrap);
+      } },
+  ];
+  if (!TABS.find((t) => t.id === activeTab)) activeTab = 'hair';
+  const tabsBar = el('div');
+  tabsBar.id = 'tabs';
+  panelEl.appendChild(tabsBar);
+  for (const t of TABS) {
+    const btn = el('button', 'tab', t.label);
+    btn.addEventListener('click', () => { activeTab = t.id; syncUI(); });
+    btn.dataset.tab = t.id;
+    tabsBar.appendChild(btn);
+    const pane = t.build();
+    pane.className = 'tabpane';
+    pane.dataset.pane = t.id;
+    panelEl.appendChild(pane);
+    t.pane = pane;
+    t.btn = btn;
+  }
+  syncUI();
 }
 function syncUI() {
   for (const t of TABS) {
@@ -450,7 +510,7 @@ function syncUI() {
   }
   for (const f of uiSync) f();
 }
-syncUI();
+buildWardrobePanel();
 
 /* ------------------------------------------------------------------ */
 /* Modes                                                               */
@@ -806,6 +866,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 /* restore last mode */
+rebuildNpcs();
 if (state.mode === 'world') enterWorld(); else enterStudio();
 
 /* test hook (harmless in production) */
@@ -817,7 +878,10 @@ window.__trepio = {
       mode: game.mode,
       pos: player.group.position.toArray(),
       npcs: npcs.map((n) => n.doll.group.position.toArray()),
+      npcNames: npcs.map((n) => n.ch.name),
+      butterflies: world.butterflies.map((b) => [b.position.x, b.position.y, b.position.z]),
       gemActive: world.gemActive,
+      gender: player.male ? 'male' : 'female',
     };
   },
 };

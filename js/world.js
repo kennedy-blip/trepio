@@ -59,11 +59,11 @@ function chocolateTex() {
     }
   }, 6, 1);
 }
-/* sprinkle ground */
-function sprinkleTex() {
+/* sprinkle "frosting grass" ground */
+function sprinkleTex(base = '#d5f0d8') {
   const colors = ['#ff8fb7', '#ffd45e', '#63b8f5', '#a7d97a', '#b57de0', '#fff'];
   return canvasTex(512, 512, (ctx, w, h) => {
-    ctx.fillStyle = '#ffd9e6';
+    ctx.fillStyle = base;
     ctx.fillRect(0, 0, w, h);
     ctx.translate(w / 2, h / 2);
     for (let i = 0; i < 340; i++) {
@@ -481,13 +481,354 @@ export function createWorld(scene, keyLight) {
     group.add(pts);
     return pts;
   }
-  const sparkA = sparkleField(150, R_BOUND, 0.4, 10, 0.14, '#ffffff');
-  const sparkB = sparkleField(80, R_BOUND, 0.4, 10, 0.26, '#fff2c9');
+  const sparkA = sparkleField(220, R_BOUND, 0.4, 11, 0.14, '#ffffff');
+  const sparkB = sparkleField(110, R_BOUND, 0.4, 11, 0.26, '#fff2c9');
+
+  /* ================= SWEET FANTASY UPGRADE ================= */
+
+  /* ---------------- frosting meadows (pastel colour patches) ---------------- */
+  for (const [x, z, r, c] of [
+    [9, 17, 7.5, '#cdeedd'], [-11, 14, 6.5, '#e4d9f7'], [24, 27, 7, '#fdf3d9'],
+    [-24, 21, 6.5, '#d9ecf7'], [12, 33, 6, '#cdeedd'], [-14, 27, 5.5, '#fbdcec'],
+  ]) {
+    const patch = new THREE.Mesh(new THREE.CircleGeometry(r, 40),
+      mat(c, { roughness: 0.9 }));
+    patch.rotation.x = -Math.PI / 2;
+    patch.position.set(x, 0.012, z);
+    patch.receiveShadow = true;
+    group.add(patch);
+  }
+
+  /* ---------------- cookie path: spawn -> maze entrance ---------------- */
+  {
+    const cookieMat = mat('#d9a066', { roughness: 0.85 });
+    const chipMat = mat('#5b3a22', { roughness: 0.9 });
+    for (let i = 0; i < 7; i++) {
+      const z = 25 - i * 0.95;
+      const x = Math.sin(i * 1.3) * 0.35;
+      const cookie = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.045, 20), cookieMat);
+      cookie.position.set(x, 0.025, z);
+      cookie.receiveShadow = true;
+      group.add(cookie);
+      for (let k = 0; k < 3; k++) {
+        const chip = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), chipMat);
+        chip.scale.y = 0.5;
+        chip.position.set(x + (Math.random() - 0.5) * 0.7, 0.05, z + (Math.random() - 0.5) * 0.7);
+        group.add(chip);
+      }
+    }
+  }
+
+  /* ---------------- candy castle (north, past the maze exit) ---------------- */
+  {
+    const castle = new THREE.Group();
+    const wallMat = mat('#fdf0f5', { roughness: 0.6 });
+    const roofPink = mat('#f45d8e', { roughness: 0.4 });
+    const roofBlue = mat('#63b8f5', { roughness: 0.4 });
+    const roofGold = mat('#ffd45e', { roughness: 0.35 });
+    function tower(x, z, r, h, roofMat_, roofH) {
+      const t = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.08, h, 18), wallMat);
+      body.position.y = h / 2;
+      body.castShadow = true;
+      t.add(body);
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(r * 1.35, roofH, 18), roofMat_);
+      roof.position.y = h + roofH / 2;
+      roof.castShadow = true;
+      t.add(roof);
+      const flag = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 8), roofGold);
+      flag.position.y = h + roofH + 0.22;
+      t.add(flag);
+      /* stripe bands */
+      for (let y = 1; y < h; y += 1.8) {
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.01, r * 1.01, 0.16, 18), stripesMat);
+        band.position.y = y;
+        t.add(band);
+      }
+      t.position.set(x, 0, z);
+      castle.add(t);
+      circles.push({ x, z, r: r * 1.15 });
+      return t;
+    }
+    tower(0, -44, 2.3, 10, roofPink, 3.4);
+    tower(-5.4, -44.5, 1.7, 7, roofBlue, 2.6);
+    tower(5.4, -44.5, 1.7, 7, roofBlue, 2.6);
+    tower(-3.4, -48.5, 1.1, 5, roofGold, 1.8);
+    tower(3.4, -48.5, 1.1, 5, roofGold, 1.8);
+    /* gate wall between towers */
+    const gate = new THREE.Mesh(new THREE.BoxGeometry(8.6, 4.6, 1.4), wallMat);
+    gate.position.set(0, 2.3, -44);
+    gate.castShadow = true;
+    castle.add(gate);
+    const door = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 1.5, 20, 1, false, 0, Math.PI), mat('#8a5a3a'));
+    door.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+    door.position.set(0, 1.0, -43.2);
+    castle.add(door);
+    const crenellation = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.35, 1.7), roofPink);
+    crenellation.position.set(0, 4.75, -44);
+    castle.add(crenellation);
+    group.add(castle);
+    boxes.push({ minX: -4.3, maxX: 4.3, minZ: -44.7, maxZ: -43.3 });
+  }
+
+  /* ---------------- rainbow over the chocolate river ---------------- */
+  {
+    const rainbowColors = ['#f45d8e', '#ff9e4f', '#ffd45e', '#a7d97a', '#63b8f5', '#8f9cf5', '#b57de0'];
+    const rainbow = new THREE.Group();
+    rainbowColors.forEach((c, i) => {
+      const arc = new THREE.Mesh(
+        new THREE.TorusGeometry(13.5 - i, 0.5, 8, 60, Math.PI),
+        new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85 })
+      );
+      rainbow.add(arc);
+    });
+    rainbow.position.set(0, 0, 33);
+    group.add(rainbow);
+    /* clouds at both ends of the rainbow */
+    const cloudEnd = mat('#ffffff', { roughness: 1 });
+    for (const s of [-1, 1]) {
+      for (const [ox, oy, sc] of [[0, 1.4, 1.3], [1.2, 1.1, 1], [-1.2, 1.2, 0.95]]) {
+        const puffBall = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 10), cloudEnd);
+        puffBall.position.set(s * 14.5 + ox, 1.6 + oy * 0.4, 33);
+        puffBall.scale.setScalar(sc);
+        group.add(puffBall);
+      }
+    }
+  }
+
+  /* ---------------- gumdrop village (near spawn) ---------------- */
+  function gumdropHouse(x, z, color) {
+    const g = new THREE.Group();
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.5, 22, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(color, { roughness: 0.35 }));
+    dome.position.y = 0.4;
+    dome.castShadow = true;
+    g.add(dome);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.6, 0.35, 22), mat('#fff6ec'));
+    base.position.y = 0.17;
+    g.add(base);
+    const door = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 16, 1, false, 0, Math.PI), mat('#8a5a3a'));
+    door.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+    door.position.set(0, 0.62, 1.42);
+    g.add(door);
+    for (const s of [-1, 1]) {
+      const win = new THREE.Mesh(new THREE.CircleGeometry(0.22, 16), new THREE.MeshStandardMaterial({ color: '#fff3b8', emissive: '#ffd45e', emissiveIntensity: 0.35 }));
+      win.position.set(s * 0.72, 0.95, 1.22);
+      win.rotation.y = s * 0.4;
+      g.add(win);
+    }
+    g.position.set(x, 0, z);
+    g.rotation.y = Math.atan2(-x + 0, -z + 20);
+    group.add(g);
+    circles.push({ x, z, r: 1.9 });
+  }
+  gumdropHouse(15.5, 23, '#ff8fb7');
+  gumdropHouse(18.5, 19.5, '#a7d97a');
+  gumdropHouse(12.5, 19, '#63b8f5');
+
+  /* cupcake house */
+  {
+    const g = new THREE.Group();
+    const wrapper = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.25, 1.5, 22), stripesMat);
+    wrapper.position.y = 0.75;
+    wrapper.castShadow = true;
+    g.add(wrapper);
+    const frosting = new THREE.Mesh(new THREE.SphereGeometry(1.55, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), mat('#fdf0f6', { roughness: 0.5 }));
+    frosting.position.y = 1.6;
+    frosting.castShadow = true;
+    g.add(frosting);
+    const cherry = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), mat('#f45d8e', { roughness: 0.3 }));
+    cherry.position.y = 3.0;
+    g.add(cherry);
+    const door = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.1, 16, 1, false, 0, Math.PI), mat('#8a5a3a'));
+    door.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+    door.position.set(0, 0.7, 1.35);
+    g.add(door);
+    g.position.set(-17, 0, 21);
+    group.add(g);
+    circles.push({ x: -17, z: 21, r: 2.1 });
+  }
+
+  /* ---------------- gummy bears ---------------- */
+  function gummyBear(x, z, color) {
+    const g = new THREE.Group();
+    const m = new THREE.MeshStandardMaterial({ color, roughness: 0.25, transparent: true, opacity: 0.85 });
+    const bodyB = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 12), m);
+    bodyB.position.y = 0.55;
+    bodyB.scale.set(1, 1.15, 0.85);
+    bodyB.castShadow = true;
+    g.add(bodyB);
+    const headB = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 12), m);
+    headB.position.y = 1.3;
+    g.add(headB);
+    for (const s of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), m);
+      ear.position.set(s * 0.22, 1.58, 0);
+      g.add(ear);
+      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.22, 4, 8), m);
+      arm.position.set(s * 0.58, 0.7, 0.1);
+      arm.rotation.z = s * 0.5;
+      g.add(arm);
+      const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.2, 4, 8), m);
+      leg.position.set(s * 0.26, 0.16, 0.08);
+      g.add(leg);
+    }
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), mat('#fff6ec', { roughness: 0.4 }));
+    belly.position.set(0, 0.48, 0.38);
+    belly.scale.set(1, 1.2, 0.5);
+    g.add(belly);
+    g.position.set(x, 0, z);
+    g.rotation.y = Math.random() * Math.PI * 2;
+    group.add(g);
+    circles.push({ x, z, r: 0.8 });
+  }
+  gummyBear(7, 14, '#ff8fb7');
+  gummyBear(-8.5, 11, '#a7d97a');
+  gummyBear(26, 6, '#ffd45e');
+  gummyBear(-21, 4, '#63b8f5');
+  gummyBear(21, 13, '#b57de0');
+  gummyBear(-5, 31, '#ff9e4f');
+
+  /* ---------------- cotton candy trees ---------------- */
+  {
+    const trunkGeo = new THREE.CylinderGeometry(0.28, 0.38, 2.6, 10);
+    const trunkMat = mat('#c9a06a', { roughness: 0.85 });
+    const fluffMats = ['#ffd9e6', '#fff0f6', '#e4d9f7', '#d9ecf7'].map((c) => mat(c, { roughness: 1 }));
+    const spots = [[-30, 30], [30, 33], [-34, -8], [36, -2], [-6, 40], [20, 41], [-40, 34], [42, 18], [8, -34], [-13, -33]];
+    spots.forEach(([x, z], i) => {
+      const t = new THREE.Mesh(trunkGeo, trunkMat);
+      t.position.set(x, 1.3, z);
+      t.castShadow = true;
+      group.add(t);
+      const fm = fluffMats[i % fluffMats.length];
+      const puffs = [[0, 3.1, 0, 1.15], [0.7, 2.8, 0.3, 0.75], [-0.65, 2.9, -0.25, 0.8], [0.1, 3.7, -0.1, 0.7]];
+      for (const [ox, oy, oz, sc] of puffs) {
+        const p = new THREE.Mesh(new THREE.SphereGeometry(0.95, 12, 10), fm);
+        p.position.set(x + ox, oy, z + oz);
+        p.scale.setScalar(sc);
+        group.add(p);
+      }
+      circles.push({ x, z, r: 0.75 });
+    });
+  }
+
+  /* ---------------- whipped cream hills ---------------- */
+  for (const [x, z, r, c] of [
+    [-38, 14, 8, '#fff6ec'], [40, 26, 7.5, '#ffd9e6'], [-44, -20, 9, '#fff0f6'],
+    [46, -18, 8, '#fdf3d9'], [-22, 42, 6.5, '#e4d9f7'], [26, 44, 7, '#d9ecf7'],
+  ]) {
+    const hill = new THREE.Mesh(new THREE.SphereGeometry(r, 22, 16), mat(c, { roughness: 1 }));
+    hill.position.set(x, -r * 0.55, z);
+    hill.castShadow = true;
+    group.add(hill);
+    circles.push({ x, z, r: r * 0.82 });
+  }
+
+  /* ---------------- lollipop flowers ---------------- */
+  {
+    const stemGeo = new THREE.CylinderGeometry(0.035, 0.05, 0.9, 8);
+    const stemMat = mat('#5eae6e', { roughness: 0.7 });
+    const petalColors = ['#ff8fb7', '#ffd45e', '#63b8f5', '#b57de0', '#ff9e4f'];
+    const spots = [
+      [5, 18.5], [7.5, 20.5], [3, 20], [12, 25.5], [17, 26.5], [14, 28.5],
+      [-6, 23.5], [-9, 25.5], [-3.5, 27], [-13, 25], [-20, 24.5], [8, 30.5],
+    ];
+    spots.forEach(([x, z], i) => {
+      const stem = new THREE.Mesh(stemGeo, stemMat);
+      stem.position.set(x, 0.45, z);
+      group.add(stem);
+      const c = petalColors[i % petalColors.length];
+      const pm = mat(c, { roughness: 0.45 });
+      for (let p = 0; p < 5; p++) {
+        const a = (p / 5) * Math.PI * 2;
+        const petal = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), pm);
+        petal.position.set(x + Math.cos(a) * 0.14, 0.92, z + Math.sin(a) * 0.14);
+        petal.scale.set(1.2, 0.55, 1.2);
+        group.add(petal);
+      }
+      const center = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), mat('#fff3b8'));
+      center.position.set(x, 0.95, z);
+      group.add(center);
+    });
+  }
+
+  /* ---------------- butterflies ---------------- */
+  const butterflies = [];
+  {
+    const bodyGeo = new THREE.CapsuleGeometry(0.022, 0.1, 3, 8);
+    const bodyMat = mat('#4a3550', { roughness: 0.6 });
+    const wingGeo = new THREE.CircleGeometry(0.17, 12);
+    const wingColors = ['#ff8fb7', '#b57de0', '#63b8f5', '#ffd45e', '#a7d97a', '#ff9e4f', '#fff0f6'];
+    const N = 24;
+    for (let i = 0; i < N; i++) {
+      const color = wingColors[i % wingColors.length];
+      const wm = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
+      const b = new THREE.Group();
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.rotation.x = Math.PI / 2;
+      b.add(body);
+      const wingL = new THREE.Group();
+      const wingR = new THREE.Group();
+      for (const [s, wg] of [[-1, wingL], [1, wingR]]) {
+        const front = new THREE.Mesh(wingGeo, wm);
+        front.scale.set(1, 0.78, 1);
+        front.position.set(s * 0.13, 0, 0.06);
+        wg.add(front);
+        const back = new THREE.Mesh(wingGeo, wm);
+        back.scale.set(0.7, 0.6, 1);
+        back.position.set(s * 0.1, 0, -0.07);
+        wg.add(back);
+        /* wings lie flat (horizontal), flap via rotation.y */
+        wg.rotation.order = 'YXZ';
+        b.add(wg);
+      }
+      b.traverse((o) => { if (o.isMesh && o.material === wm) { o.rotation.x = 0; } });
+      /* flatten wing circles to horizontal */
+      wingL.children.forEach((c) => { c.rotation.x = -Math.PI / 2; });
+      wingR.children.forEach((c) => { c.rotation.x = -Math.PI / 2; });
+      /* anchors spread over the world, higher above the maze island */
+      let ax, az;
+      do {
+        const a = Math.random() * Math.PI * 2;
+        const r = 6 + Math.random() * 40;
+        ax = Math.cos(a) * r;
+        az = Math.sin(a) * r;
+      } while (Math.abs(ax) < 40 && Math.abs(az) < 40 && false);
+      let h = 1 + Math.random() * 3.2;
+      if (Math.abs(ax) < 21 && Math.abs(az) < 21) h = Math.max(h, 3.9);
+      b.userData = {
+        anchor: new THREE.Vector3(ax, h, az),
+        orbitR: 1.5 + Math.random() * 4,
+        speed: (0.25 + Math.random() * 0.5) * (Math.random() < 0.5 ? 1 : -1),
+        phase: Math.random() * Math.PI * 2,
+        flapSpeed: 14 + Math.random() * 10,
+      };
+      group.add(b);
+      butterflies.push(b);
+    }
+  }
+  function updateButterflies(dt, t) {
+    for (const b of butterflies) {
+      const d = b.userData;
+      const angle = t * d.speed + d.phase;
+      const wobble = 1 + 0.18 * Math.sin(t * 0.37 + d.phase);
+      b.position.set(
+        d.anchor.x + Math.cos(angle) * d.orbitR * wobble,
+        d.anchor.y + Math.sin(t * 1.3 + d.phase) * 0.55 + Math.sin(angle * 2) * 0.25,
+        d.anchor.z + Math.sin(angle) * d.orbitR
+      );
+      const vx = -Math.sin(angle) * d.speed;
+      const vz = Math.cos(angle) * d.speed;
+      b.rotation.y = Math.atan2(vx, vz);
+      const flap = 0.2 + Math.abs(Math.sin(t * d.flapSpeed + d.phase)) * 0.85;
+      b.children[1].rotation.y = -flap;   /* wingL */
+      b.children[2].rotation.y = flap;    /* wingR */
+    }
+  }
 
   /* ---------------- api ---------------- */
   return {
     group, boxes, circles, R_BOUND,
-    gem,
+    gem, butterflies,
     spawn: new THREE.Vector3(0, 0, HALF * CELL + 7.5),
     get gemActive() { return gemActive; },
     collectGem() {
@@ -513,6 +854,7 @@ export function createWorld(scene, keyLight) {
         c.position.y = c.userData.baseY + Math.sin(t * 0.35 + c.userData.phase) * 0.8;
       }
       riverTex.offset.x += dt * 0.045;
+      updateButterflies(dt, t);
       sparkA.rotation.y += dt * 0.02;
       sparkB.rotation.y -= dt * 0.016;
       sparkA.material.opacity = 0.55 + 0.25 * Math.sin(t * 2.1);
