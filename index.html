@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Trepio Doll — Dress Up &amp; Dance</title>
-<meta name="description" content="A tiny 3D dress-up doll game: style her hair, outfits and accessories, then make her dance.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💃</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Trepio Candy World</title>
+<meta name="description" content="Dress up your doll and explore an open candy world — maze, lollipop forest, chocolate river and ice cream mountains.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍬</text></svg>">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<canvas id="stage" aria-label="3D doll stage"></canvas>
+<canvas id="stage" aria-label="3D candy world"></canvas>
 
 <div id="fallback" hidden>
   <div>
@@ -18,32 +18,52 @@
   </div>
 </div>
 
-<header id="hud">
-  <h1>Trepio&nbsp;Doll <span aria-hidden="true">✨</span></h1>
-  <p>dress her up &middot; make her dance</p>
-  <p class="hint">drag to orbit · scroll to zoom · tap the doll to say hi</p>
-</header>
+<!-- ============ title / character select ============ -->
+<div id="title">
+  <div class="titlecard">
+    <h1>🍬 Trepio Candy World</h1>
+    <p class="tag">pick your doll · dress her up · explore the candy world</p>
+    <div id="charRow"></div>
+    <div id="charInfo"></div>
+    <div class="btnrow">
+      <button id="btnCustomize" class="action">✨ Customize</button>
+      <button id="btnEnter" class="action primary">▶ Enter the World</button>
+    </div>
+    <p class="hint">WASD / arrows to move · Space to jump · drag to look · E wave · R dance</p>
+  </div>
+</div>
 
-<div id="actionbar">
+<!-- ============ world HUD ============ -->
+<div id="hud" class="hidden">
+  <div id="hudName"></div>
+</div>
+
+<!-- ============ dress-up panel ============ -->
+<nav id="panel" aria-label="Dress-up controls"></nav>
+
+<!-- ============ world action bar ============ -->
+<div id="actionbar" class="hidden">
   <button id="btnDance" class="action primary">💃 Dance</button>
   <button id="btnWave" class="action">👋 Wave</button>
   <button id="btnSpin" class="action">🌀 Spin</button>
-  <button id="btnRandom" class="action">🎲 Surprise</button>
+  <button id="btnJump" class="action">🤸 Jump</button>
   <button id="btnMute" class="action icon" title="Music on/off" aria-label="Music on/off">🔊</button>
+  <button id="btnHome" class="action icon" title="Back to studio" aria-label="Back to studio">🏠</button>
 </div>
 
-<nav id="panel" aria-label="Dress-up controls"></nav>
+<!-- ============ touch joystick ============ -->
+<div id="joy"><div id="joyKnob"></div></div>
 
-<footer id="credit">made with 💜 — trepio</footer>
+<!-- ============ toast ============ -->
+<div id="toast"></div>
 
 <script type="importmap">
 {
   "imports": {
-    "three": "./vendor/three.module.js",
-    "three/addons/": "./vendor/addons/"
+    "three": "./vendor/three.module.js"
   }
 }
 </script>
-<script type="module" src="game.js"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
