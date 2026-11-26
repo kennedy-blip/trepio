@@ -825,10 +825,85 @@ export function createWorld(scene, keyLight) {
     }
   }
 
+  /* ---------------- collectible candies ---------------- */
+  const candies = [];
+  {
+    const bodyGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.16, 10);
+    const wrapGeo = new THREE.ConeGeometry(0.09, 0.13, 8);
+    const colors = ['#ff8fb7', '#ffd45e', '#63b8f5', '#a7d97a', '#b57de0', '#ff9e4f'];
+    const mats = colors.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.35 }));
+    /* maze dead-end rooms (odd,odd cells are always corridors) */
+    const spots = [];
+    for (const [cx, cy] of [[1, 1], [5, 5], [9, 1], [13, 3], [17, 17], [3, 15]]) {
+      spots.push([(cx - HALF) * CELL, (cy - HALF) * CELL]);
+    }
+    spots.push(
+      [1.2, 22.5], [-1.6, 24], [14, 21.5], [18.5, 23], [-4, 28.2], [5, 28.2],
+      [-18, 32], [18, 32], [26, 12], [-27, 7], [30, 27], [-31, 29],
+      [8, 30.5], [-9, 27], [24, -6], [-24, -4], [36, -8], [-36, -6],
+      [12, 38], [-12, 39], [0, -24], [4, -26]
+    );
+    for (const [x, z] of spots) {
+      const m = mats[(Math.random() * colors.length) | 0];
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(bodyGeo, m);
+      body.rotation.z = Math.PI / 2;
+      g.add(body);
+      for (const s of [-1, 1]) {
+        const w = new THREE.Mesh(wrapGeo, m);
+        w.rotation.z = (s * Math.PI) / 2;
+        w.position.x = s * 0.13;
+        g.add(w);
+      }
+      g.position.set(x, 0.45, z);
+      g.userData = { baseY: 0.45, phase: Math.random() * 6 };
+      group.add(g);
+      candies.push({ obj: g, x, z, active: true, respawn: 0 });
+    }
+  }
+
+  /* ---------------- golden gummy bear (quest) ---------------- */
+  const goldenBear = { active: true };
+  {
+    const gold = new THREE.MeshStandardMaterial({ color: '#ffd45e', metalness: 0.6, roughness: 0.25, emissive: '#ffb84e', emissiveIntensity: 0.25 });
+    const g = new THREE.Group();
+    const bodyB = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 12), gold);
+    bodyB.position.y = 0.55;
+    bodyB.scale.set(1, 1.15, 0.85);
+    g.add(bodyB);
+    const headB = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 12), gold);
+    headB.position.y = 1.3;
+    g.add(headB);
+    for (const s of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), gold);
+      ear.position.set(s * 0.22, 1.58, 0);
+      g.add(ear);
+      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.22, 4, 8), gold);
+      arm.position.set(s * 0.58, 0.7, 0.1);
+      arm.rotation.z = s * 0.5;
+      g.add(arm);
+      const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.2, 4, 8), gold);
+      leg.position.set(s * 0.26, 0.16, 0.08);
+      g.add(leg);
+    }
+    g.position.set(43, 0, -25);
+    g.rotation.y = -0.6;
+    group.add(g);
+    goldenBear.obj = g;
+    const gl = new THREE.PointLight('#ffd45e', 6, 8);
+    gl.position.set(43, 2.2, -25);
+    group.add(gl);
+    goldenBear.light = gl;
+  }
+
   /* ---------------- api ---------------- */
   return {
     group, boxes, circles, R_BOUND,
     gem, butterflies,
+    candies, goldenBear,
+    castlePos: new THREE.Vector3(0, 0, -43),
+    donuts: [new THREE.Vector3(-18, 0, 32), new THREE.Vector3(0, 0, 32), new THREE.Vector3(18, 0, 32)],
+    villagePos: new THREE.Vector3(15.5, 0, 21),
     spawn: new THREE.Vector3(0, 0, HALF * CELL + 7.5),
     get gemActive() { return gemActive; },
     collectGem() {
@@ -855,6 +930,19 @@ export function createWorld(scene, keyLight) {
       }
       riverTex.offset.x += dt * 0.045;
       updateButterflies(dt, t);
+      /* collectible candies: float, spin, respawn */
+      for (const c of candies) {
+        if (c.active) {
+          c.obj.position.y = c.obj.userData.baseY + Math.sin(t * 2.2 + c.obj.userData.phase) * 0.09;
+          c.obj.rotation.y += dt * 1.8;
+        } else if (c.respawn > 0) {
+          c.respawn -= dt;
+          if (c.respawn <= 0) { c.active = true; c.obj.visible = true; }
+        }
+      }
+      if (goldenBear.active) {
+        goldenBear.obj.rotation.y = -0.6 + Math.sin(t * 0.8) * 0.25;
+      }
       sparkA.rotation.y += dt * 0.02;
       sparkB.rotation.y -= dt * 0.016;
       sparkA.material.opacity = 0.55 + 0.25 * Math.sin(t * 2.1);

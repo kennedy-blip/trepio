@@ -27,6 +27,7 @@ export const OUTFITS = [
   { id: 'gown',     label: '🎀 Ball gown', flare: 0.53, len: 0.58, puff: 0.055, belt: false, trim: true  },
   { id: 'party',    label: '🎉 Party',     flare: 0.27, len: 0.34, puff: 0.066, belt: true,  trim: true  },
   { id: 'coord',    label: '🧶 Co-ord',    flare: 0.33, len: 0.46, puff: 0,     belt: false, trim: false },
+  { id: 'rainbow',  label: '🌈 Rainbow Gown', flare: 0.50, len: 0.60, puff: 0.07, belt: false, trim: true, locked: 2 },
 ];
 
 export const MALE_HAIRSTYLES = [
@@ -40,6 +41,7 @@ export const MALE_OUTFITS = [
   { id: 'explorer', label: '🧭 Explorer', len: 0.17, belt: true,  jacket: false },
   { id: 'sporty',   label: '⚽ Sporty',   len: 0.15, belt: false, jacket: false },
   { id: 'smart',    label: '🎩 Smart',    len: 0.36, belt: true,  jacket: true  },
+  { id: 'star',     label: '✨ Star Suit', len: 0.30, belt: true, jacket: true, locked: 2 },
 ];
 
 export const SHOESTYLES = [
@@ -53,12 +55,57 @@ export const ACCESSORIES = [
   { id: 'glasses',  label: '👓 Glasses'  },
   { id: 'necklace', label: '📿 Necklace' },
   { id: 'earrings', label: '💎 Earrings' },
+  { id: 'wings',    label: '🦋 Wings', locked: 3 },
+  { id: 'halo',     label: '🌟 Halo',  locked: 4 },
 ];
 export const MALE_ACCESSORIES = [
   { id: 'crown',   label: '👑 Crown'    },
   { id: 'bow',     label: '🎀 Bow tie'  },
   { id: 'glasses', label: '👓 Glasses'  },
+  { id: 'wings',   label: '🦋 Wings', locked: 3 },
+  { id: 'halo',    label: '🌟 Halo',  locked: 4 },
 ];
+
+/* unlockable outfit textures (built lazily) */
+let _rainbowTex = null, _starTex = null;
+export function rainbowTexture() {
+  if (_rainbowTex) return _rainbowTex;
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const ctx = c.getContext('2d');
+  const colors = ['#f45d8e', '#ff9e4f', '#ffd45e', '#a7d97a', '#63b8f5', '#8f9cf5', '#b57de0'];
+  ctx.save();
+  ctx.translate(64, 64);
+  ctx.rotate(-Math.PI / 4);
+  const band = 128 / 7;
+  colors.forEach((col, i) => {
+    ctx.fillStyle = col;
+    ctx.fillRect(-128 + i * band * 1.45, -128, band * 1.45, 256);
+  });
+  ctx.restore();
+  _rainbowTex = new THREE.CanvasTexture(c);
+  _rainbowTex.colorSpace = THREE.SRGBColorSpace;
+  return _rainbowTex;
+}
+export function starTexture() {
+  if (_starTex) return _starTex;
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#33304a';
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.fillStyle = '#ffd45e';
+  for (let i = 0; i < 26; i++) {
+    const x = Math.random() * 128, y = Math.random() * 128;
+    const r = 1.5 + Math.random() * 3.5;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  _starTex = new THREE.CanvasTexture(c);
+  _starTex.colorSpace = THREE.SRGBColorSpace;
+  return _starTex;
+}
 
 /* shared, non-varying materials */
 const goldMat  = new THREE.MeshStandardMaterial({ color: '#f3c14b', metalness: 0.75, roughness: 0.28 });
@@ -103,6 +150,7 @@ export function createDoll(cfg) {
   const smileMat  = new THREE.MeshStandardMaterial({ color: '#c9556e', roughness: 0.6 });
   const blushMat  = new THREE.MeshStandardMaterial({ color: '#ff9fb0', roughness: 0.9, transparent: true, opacity: male ? 0.3 : 0.6 });
   const pupilMat  = new THREE.MeshStandardMaterial({ color: cfg.eyes, roughness: 0.25 });
+  const apiMats   = { skinMat, hairMat, topMat, skirtMat, accentMat, shoeMat, pupilMat, blushMat };
 
   const group = new THREE.Group();      // yaw / spin pivot
   const body = new THREE.Group();       // bounce / sway pivot
@@ -305,11 +353,16 @@ export function createDoll(cfg) {
 
   /* ---------- bottoms: skirt (female) / trousers (male) ---------- */
   let waist = null;
+  let wingL = null, wingR = null, halo = null;
   function buildBottom() {
     if (male) {
       for (const { trouser } of [legL, legR2]) clearGroup(trouser);
       if (waist) { body.remove(waist); waist.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); waist = null; }
       const o = MALE_OUTFITS.find((x) => x.id === cfg.outfit) || MALE_OUTFITS[0];
+      const starry = cfg.outfit === 'star';
+      skirtMat.map = starry ? starTexture() : null;
+      skirtMat.color.set(starry ? '#ffffff' : cfg.skirt);
+      skirtMat.needsUpdate = true;
       for (const { trouser } of [legL, legR2]) {
         const leg = mesh(new THREE.CapsuleGeometry(legR + 0.012, o.len, 4, 12), skirtMat, 0, -(o.len / 2 + 0.04), 0);
         trouser.add(leg);
@@ -327,6 +380,10 @@ export function createDoll(cfg) {
     /* female: skirt */
     clearGroup(skirtGroup);
     const o = OUTFITS.find((x) => x.id === cfg.outfit) || OUTFITS[0];
+    const rainbow = cfg.outfit === 'rainbow';
+    skirtMat.map = rainbow ? rainbowTexture() : null;
+    skirtMat.color.set(rainbow ? '#ffffff' : cfg.skirt);
+    skirtMat.needsUpdate = true;
     const pts = [];
     const N = 12;
     for (let i = 0; i <= N; i++) {
@@ -463,6 +520,48 @@ export function createDoll(cfg) {
     }
   }
 
+  /* butterfly wings (unlockable) */
+  {
+    const g = new THREE.Group();
+    g.position.set(0, 0.22, -0.17);
+    const wm = new THREE.MeshBasicMaterial({ map: rainbowTexture(), side: THREE.DoubleSide, transparent: true, opacity: 0.92 });
+    const wingGeo = new THREE.CircleGeometry(0.26, 14);
+    const mkWing = (s) => {
+      const wg = new THREE.Group();
+      const front = new THREE.Mesh(wingGeo, wm);
+      front.scale.set(1, 0.85, 1);
+      front.position.set(s * 0.17, 0.03, 0);
+      front.rotation.x = -Math.PI / 2;
+      wg.add(front);
+      const back = new THREE.Mesh(wingGeo, wm);
+      back.scale.set(0.6, 0.55, 1);
+      back.position.set(s * 0.11, 0.01, -0.1);
+      back.rotation.x = -Math.PI / 2;
+      wg.add(back);
+      g.add(wg);
+      return wg;
+    };
+    wingL = mkWing(-1);
+    wingR = mkWing(1);
+    torso.add(g);
+    acc.wings = g;
+    apiMats.wingMat = wm;
+  }
+
+  /* halo (unlockable) */
+  {
+    const g = new THREE.Group();
+    const hm = new THREE.MeshStandardMaterial({ color: '#ffe9a8', emissive: '#ffd45e', emissiveIntensity: 0.7, roughness: 0.3 });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.014, 10, 24), hm);
+    ring.rotation.x = Math.PI / 2;
+    g.add(ring);
+    g.position.set(0, 0.46, 0);
+    headPivot.add(g);
+    acc.halo = g;
+    halo = g;
+    apiMats.haloMat = hm;
+  }
+
   group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 
   buildHair();
@@ -475,7 +574,7 @@ export function createDoll(cfg) {
   /* ------------------------- api ------------------------- */
   const api = {
     group, cfg, male,
-    mats: { skinMat, hairMat, topMat, skirtMat, accentMat, shoeMat, pupilMat, blushMat },
+    mats: apiMats,
     buildHair, buildBottom, buildSkirt: buildBottom, buildShoes,
     setAccessory(id, on) { cfg.accessories[id] = on; if (acc[id]) acc[id].visible = on; },
     waveT: 0, boingT: 0,
@@ -539,6 +638,17 @@ export function createDoll(cfg) {
         const sway = 1 + (0.05 * Math.sin(phase * Math.PI * 4) * b + 0.04 * Math.abs(swing) * w);
         skirtGroup.scale.set(sway, 1, sway);
         skirtGroup.rotation.z = Math.sin(phase * Math.PI * 2) * 0.07 * b + swing * 0.06 * w;
+      }
+
+      /* wings flap & halo bob (unlockables) */
+      if (acc.wings && acc.wings.visible) {
+        const flap = 0.15 + Math.abs(Math.sin(t * 6 + w * 3)) * 0.75;
+        wingL.rotation.y = -flap;
+        wingR.rotation.y = flap;
+      }
+      if (halo && halo.visible) {
+        halo.position.y = 0.46 + Math.sin(t * 2) * 0.02;
+        halo.rotation.y += dt * 0.8;
       }
 
       /* hair secondary motion */
