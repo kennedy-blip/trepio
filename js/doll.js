@@ -1,5 +1,5 @@
 /* =====================================================================
-   doll.js — procedural 3D doll factory (multiple instances)
+   doll.js — procedural 3D doll factory (multiple instances, both genders)
    Each doll is built entirely from primitives and can be animated with
    idle / walk / dance / wave states via update().
    ===================================================================== */
@@ -28,6 +28,20 @@ export const OUTFITS = [
   { id: 'party',    label: '🎉 Party',     flare: 0.27, len: 0.34, puff: 0.066, belt: true,  trim: true  },
   { id: 'coord',    label: '🧶 Co-ord',    flare: 0.33, len: 0.46, puff: 0,     belt: false, trim: false },
 ];
+
+export const MALE_HAIRSTYLES = [
+  { id: 'mshort',   label: '🌰 Short crop' },
+  { id: 'quiff',    label: '⚡ Quiff' },
+  { id: 'curly',    label: '🌀 Curly' },
+  { id: 'sidepart', label: '〰️ Side part' },
+];
+export const MALE_OUTFITS = [
+  { id: 'mprince',  label: '🤴 Prince',   len: 0.32, belt: true,  jacket: true  },
+  { id: 'explorer', label: '🧭 Explorer', len: 0.17, belt: true,  jacket: false },
+  { id: 'sporty',   label: '⚽ Sporty',   len: 0.15, belt: false, jacket: false },
+  { id: 'smart',    label: '🎩 Smart',    len: 0.36, belt: true,  jacket: true  },
+];
+
 export const SHOESTYLES = [
   { id: 'flats',  label: '🩰 Flats'  },
   { id: 'boots',  label: '🥾 Boots'  },
@@ -39,6 +53,11 @@ export const ACCESSORIES = [
   { id: 'glasses',  label: '👓 Glasses'  },
   { id: 'necklace', label: '📿 Necklace' },
   { id: 'earrings', label: '💎 Earrings' },
+];
+export const MALE_ACCESSORIES = [
+  { id: 'crown',   label: '👑 Crown'    },
+  { id: 'bow',     label: '🎀 Bow tie'  },
+  { id: 'glasses', label: '👓 Glasses'  },
 ];
 
 /* shared, non-varying materials */
@@ -57,6 +76,7 @@ function mesh(geo, material, x = 0, y = 0, z = 0) {
   return m;
 }
 function clearGroup(g) {
+  if (!g) return;
   for (const c of [...g.children]) {
     g.remove(c);
     c.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
@@ -65,10 +85,13 @@ function clearGroup(g) {
 
 /* =====================================================================
    createDoll(cfg) -> api
-   cfg: { hair, hairColor, skin, eyes, outfit, top, skirt,
+   cfg: { gender?, hair, hairColor, skin, eyes, outfit, top, skirt,
           shoes, shoeColor, accessories:{...} }
+   'skirt' doubles as the bottom colour (trousers/shorts) for male dolls.
    ===================================================================== */
 export function createDoll(cfg) {
+  const male = cfg.gender === 'male';
+
   /* per-instance materials */
   const skinMat   = new THREE.MeshStandardMaterial({ color: cfg.skin, roughness: 0.65 });
   const hairMat   = new THREE.MeshStandardMaterial({ color: cfg.hairColor, roughness: 0.45, side: THREE.DoubleSide });
@@ -78,41 +101,45 @@ export function createDoll(cfg) {
   const trimMat   = new THREE.MeshStandardMaterial({ color: '#fff6ec', roughness: 0.5 });
   const shoeMat   = new THREE.MeshStandardMaterial({ color: cfg.shoeColor, roughness: 0.4 });
   const smileMat  = new THREE.MeshStandardMaterial({ color: '#c9556e', roughness: 0.6 });
-  const blushMat  = new THREE.MeshStandardMaterial({ color: '#ff9fb0', roughness: 0.9, transparent: true, opacity: 0.6 });
+  const blushMat  = new THREE.MeshStandardMaterial({ color: '#ff9fb0', roughness: 0.9, transparent: true, opacity: male ? 0.3 : 0.6 });
   const pupilMat  = new THREE.MeshStandardMaterial({ color: cfg.eyes, roughness: 0.25 });
 
   const group = new THREE.Group();      // yaw / spin pivot
   const body = new THREE.Group();       // bounce / sway pivot
   group.add(body);
 
-  /* legs */
+  /* legs (pivot at hips) — male legs carry the trousers */
   const HIP_Y = 0.52;
+  const legR = male ? 0.062 : 0.055;
   function makeLeg(side) {
     const hip = new THREE.Group();
-    hip.position.set(0.075 * side, HIP_Y, 0);
-    const leg = mesh(new THREE.CapsuleGeometry(0.055, 0.34, 4, 12), skinMat, 0, -0.20, 0);
+    hip.position.set((male ? 0.082 : 0.075) * side, HIP_Y, 0);
+    const leg = mesh(new THREE.CapsuleGeometry(legR, 0.34, 4, 12), skinMat, 0, -0.20, 0);
     hip.add(leg);
     const shoe = new THREE.Group();
     shoe.position.set(0, -0.465, 0.015);
     hip.add(shoe);
+    const trouser = new THREE.Group();
+    hip.add(trouser);
     body.add(hip);
-    return { hip, shoe };
+    return { hip, shoe, trouser };
   }
   const legL = makeLeg(-1);
-  const legR = makeLeg(1);
+  const legR2 = makeLeg(1);
 
   /* torso */
   const torso = new THREE.Group();
   torso.position.set(0, 0.55, 0);
   body.add(torso);
-  torso.add(mesh(new THREE.CapsuleGeometry(0.108, 0.20, 4, 14), topMat, 0, 0.16, 0));
+  torso.add(mesh(new THREE.CapsuleGeometry(male ? 0.118 : 0.108, male ? 0.22 : 0.20, 4, 14), topMat, 0, 0.16, 0));
   torso.add(mesh(new THREE.CylinderGeometry(0.034, 0.038, 0.09, 12), skinMat, 0, 0.315, 0));
 
-  /* arms */
+  /* arms (pivot at shoulders) */
+  const SH_X = male ? 0.162 : 0.148;
   function makeArm(side) {
     const shoulder = new THREE.Group();
-    shoulder.position.set(0.148 * side, 0.27, 0);
-    shoulder.add(mesh(new THREE.CapsuleGeometry(0.045, 0.22, 4, 10), skinMat, 0, -0.145, 0));
+    shoulder.position.set(SH_X * side, 0.27, 0);
+    shoulder.add(mesh(new THREE.CapsuleGeometry(male ? 0.05 : 0.045, 0.22, 4, 10), skinMat, 0, -0.145, 0));
     shoulder.add(mesh(new THREE.SphereGeometry(0.049, 14, 10), skinMat, 0, -0.275, 0));
     const puff = mesh(new THREE.SphereGeometry(0.08, 12, 10), topMat, 0, -0.045, 0);
     shoulder.add(puff);
@@ -123,12 +150,14 @@ export function createDoll(cfg) {
   const armL = makeArm(-1);
   const armR = makeArm(1);
 
-  /* skirt */
-  const skirtGroup = new THREE.Group();
-  skirtGroup.position.set(0, 0.585, 0);
-  body.add(skirtGroup);
+  /* skirt (female only) */
+  const skirtGroup = male ? null : new THREE.Group();
+  if (skirtGroup) {
+    skirtGroup.position.set(0, 0.585, 0);
+    body.add(skirtGroup);
+  }
 
-  /* head */
+  /* head (pivot at neck top) */
   const headPivot = new THREE.Group();
   headPivot.position.set(0, 0.38, 0);
   torso.add(headPivot);
@@ -152,7 +181,7 @@ export function createDoll(cfg) {
   const eyeR = makeEye(1);
 
   for (const s of [-1, 1]) {
-    const brow = mesh(new THREE.BoxGeometry(0.082, 0.014, 0.012), hairMat, 0.08 * s, 0.305, 0.152);
+    const brow = mesh(new THREE.BoxGeometry(male ? 0.092 : 0.082, male ? 0.02 : 0.014, 0.012), hairMat, 0.08 * s, 0.305, 0.152);
     brow.rotation.z = -0.12 * s;
     headPivot.add(brow);
   }
@@ -178,6 +207,44 @@ export function createDoll(cfg) {
   function buildHair() {
     clearGroup(hairG);
     tailPivot = null; bunL = bunR = null;
+    if (male) {
+      const cap = mesh(new THREE.SphereGeometry(0.205, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.46), hairMat, 0, 0.185, -0.015);
+      hairG.add(cap);
+      const backVol = mesh(new THREE.SphereGeometry(0.185, 20, 16), hairMat, 0, 0.155, -0.075);
+      hairG.add(backVol);
+      switch (cfg.hair) {
+        case 'quiff': {
+          for (const [x, y, z, sc] of [[0, 0.345, 0.115, 1], [0.05, 0.36, 0.06, 0.8], [-0.05, 0.36, 0.06, 0.8]]) {
+            const q = mesh(new THREE.SphereGeometry(0.055, 12, 10), hairMat, x, y, z);
+            q.scale.set(sc, sc * 1.25, sc * 0.9);
+            hairG.add(q);
+          }
+          break;
+        }
+        case 'curly': {
+          for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2;
+            const r = 0.13;
+            const c = mesh(new THREE.SphereGeometry(0.05, 10, 8), hairMat,
+              Math.cos(a) * r, 0.345 + Math.sin(i * 1.7) * 0.02, Math.sin(a) * r * 0.8 - 0.02);
+            hairG.add(c);
+          }
+          break;
+        }
+        case 'sidepart': {
+          const sweep = mesh(new THREE.SphereGeometry(0.055, 12, 10), hairMat, 0.06, 0.325, 0.115);
+          sweep.scale.set(1.5, 0.55, 0.85);
+          hairG.add(sweep);
+          const side = mesh(new THREE.SphereGeometry(0.05, 10, 8), hairMat, -0.115, 0.24, 0.06);
+          side.scale.set(0.6, 1.2, 0.8);
+          hairG.add(side);
+          break;
+        }
+        default: break; /* mshort: just the cap */
+      }
+      return;
+    }
+    /* ---- female ---- */
     const cap = mesh(new THREE.SphereGeometry(0.205, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.34), hairMat, 0, 0.185, -0.015);
     hairG.add(cap);
     const backVol = mesh(new THREE.SphereGeometry(0.185, 20, 16), hairMat, 0, 0.155, -0.08);
@@ -236,8 +303,28 @@ export function createDoll(cfg) {
     }
   }
 
-  /* skirt variants */
-  function buildSkirt() {
+  /* ---------- bottoms: skirt (female) / trousers (male) ---------- */
+  let waist = null;
+  function buildBottom() {
+    if (male) {
+      for (const { trouser } of [legL, legR2]) clearGroup(trouser);
+      if (waist) { body.remove(waist); waist.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); waist = null; }
+      const o = MALE_OUTFITS.find((x) => x.id === cfg.outfit) || MALE_OUTFITS[0];
+      for (const { trouser } of [legL, legR2]) {
+        const leg = mesh(new THREE.CapsuleGeometry(legR + 0.012, o.len, 4, 12), skirtMat, 0, -(o.len / 2 + 0.04), 0);
+        trouser.add(leg);
+      }
+      waist = mesh(new THREE.CylinderGeometry(0.105, 0.115, 0.09, 16), skirtMat, 0, HIP_Y - 0.045, 0);
+      body.add(waist);
+      if (o.belt) {
+        const belt = mesh(new THREE.TorusGeometry(0.108, 0.02, 10, 24), accentMat, 0, 0.04, 0);
+        belt.rotation.x = Math.PI / 2;
+        waist.add(belt);
+      }
+      armL.puff.visible = armR.puff.visible = false;
+      return;
+    }
+    /* female: skirt */
     clearGroup(skirtGroup);
     const o = OUTFITS.find((x) => x.id === cfg.outfit) || OUTFITS[0];
     const pts = [];
@@ -267,7 +354,7 @@ export function createDoll(cfg) {
 
   /* shoes */
   function buildShoes() {
-    for (const { shoe } of [legL, legR]) {
+    for (const { shoe } of [legL, legR2]) {
       clearGroup(shoe);
       if (cfg.shoes === 'boots') {
         const shaft = mesh(new THREE.CylinderGeometry(0.062, 0.066, 0.20, 14), shoeMat, 0, 0.10, 0);
@@ -310,17 +397,29 @@ export function createDoll(cfg) {
     acc.crown = g;
   }
   {
+    /* bow — hair bow (female) or bow tie (male) */
     const g = new THREE.Group();
-    g.position.set(0.155, 0.30, 0.095);
-    g.rotation.z = -0.3;
-    const knot = mesh(new THREE.SphereGeometry(0.027, 12, 10), accentMat);
-    const wingL = mesh(new THREE.ConeGeometry(0.045, 0.09, 10), accentMat, -0.05, 0, 0);
-    wingL.rotation.z = Math.PI / 2;
-    const wingR = mesh(new THREE.ConeGeometry(0.045, 0.09, 10), accentMat, 0.05, 0, 0);
-    wingR.rotation.z = -Math.PI / 2;
-    const ribbon = mesh(new THREE.ConeGeometry(0.03, 0.06, 8), accentMat, 0, -0.045, 0);
-    ribbon.rotation.z = Math.PI;
-    g.add(knot, wingL, wingR, ribbon);
+    if (male) {
+      g.position.set(0, 0.285, 0.115);
+      g.rotation.set(-0.15, 0, 0);
+      const knot = mesh(new THREE.SphereGeometry(0.019, 12, 10), accentMat);
+      const wingL = mesh(new THREE.ConeGeometry(0.03, 0.06, 10), accentMat, -0.036, 0, 0);
+      wingL.rotation.z = Math.PI / 2;
+      const wingR = mesh(new THREE.ConeGeometry(0.03, 0.06, 10), accentMat, 0.036, 0, 0);
+      wingR.rotation.z = -Math.PI / 2;
+      g.add(knot, wingL, wingR);
+    } else {
+      g.position.set(0.155, 0.30, 0.095);
+      g.rotation.z = -0.3;
+      const knot = mesh(new THREE.SphereGeometry(0.027, 12, 10), accentMat);
+      const wingL = mesh(new THREE.ConeGeometry(0.045, 0.09, 10), accentMat, -0.05, 0, 0);
+      wingL.rotation.z = Math.PI / 2;
+      const wingR = mesh(new THREE.ConeGeometry(0.045, 0.09, 10), accentMat, 0.05, 0, 0);
+      wingR.rotation.z = -Math.PI / 2;
+      const ribbon = mesh(new THREE.ConeGeometry(0.03, 0.06, 8), accentMat, 0, -0.045, 0);
+      ribbon.rotation.z = Math.PI;
+      g.add(knot, wingL, wingR, ribbon);
+    }
     headPivot.add(g);
     acc.bow = g;
   }
@@ -340,46 +439,51 @@ export function createDoll(cfg) {
     headPivot.add(g);
     acc.glasses = g;
   }
-  {
-    const g = new THREE.Group();
-    g.position.set(0, 0.335, 0.028);
-    g.rotation.x = 0.38;
-    const chain = mesh(new THREE.TorusGeometry(0.075, 0.009, 10, 28), goldMat);
-    const pendant = mesh(new THREE.SphereGeometry(0.018, 12, 10), gemMat, 0, -0.062, 0.062);
-    g.add(chain, pendant);
-    torso.add(g);
-    acc.necklace = g;
-  }
-  {
-    const g = new THREE.Group();
-    for (const s of [-1, 1]) {
-      g.add(mesh(new THREE.SphereGeometry(0.013, 10, 8), goldMat, 0.187 * s, 0.115, 0.008));
-      const drop = mesh(new THREE.ConeGeometry(0.011, 0.03, 8), gemMat, 0.187 * s, 0.092, 0.008);
-      drop.rotation.x = Math.PI;
-      g.add(drop);
+  if (!male) {
+    {
+      const g = new THREE.Group();
+      g.position.set(0, 0.335, 0.028);
+      g.rotation.x = 0.38;
+      const chain = mesh(new THREE.TorusGeometry(0.075, 0.009, 10, 28), goldMat);
+      const pendant = mesh(new THREE.SphereGeometry(0.018, 12, 10), gemMat, 0, -0.062, 0.062);
+      g.add(chain, pendant);
+      torso.add(g);
+      acc.necklace = g;
     }
-    headPivot.add(g);
-    acc.earrings = g;
+    {
+      const g = new THREE.Group();
+      for (const s of [-1, 1]) {
+        g.add(mesh(new THREE.SphereGeometry(0.013, 10, 8), goldMat, 0.187 * s, 0.115, 0.008));
+        const drop = mesh(new THREE.ConeGeometry(0.011, 0.03, 8), gemMat, 0.187 * s, 0.092, 0.008);
+        drop.rotation.x = Math.PI;
+        g.add(drop);
+      }
+      headPivot.add(g);
+      acc.earrings = g;
+    }
   }
 
   group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 
   buildHair();
-  buildSkirt();
+  buildBottom();
   buildShoes();
-  for (const a of ACCESSORIES) acc[a.id].visible = !!cfg.accessories[a.id];
+  for (const a of ACCESSORIES) {
+    if (acc[a.id]) acc[a.id].visible = !!cfg.accessories[a.id];
+  }
 
   /* ------------------------- api ------------------------- */
   const api = {
-    group, cfg,
+    group, cfg, male,
     mats: { skinMat, hairMat, topMat, skirtMat, accentMat, shoeMat, pupilMat, blushMat },
-    buildHair, buildSkirt, buildShoes,
-    setAccessory(id, on) { cfg.accessories[id] = on; acc[id].visible = on; },
+    buildHair, buildBottom, buildSkirt: buildBottom, buildShoes,
+    setAccessory(id, on) { cfg.accessories[id] = on; if (acc[id]) acc[id].visible = on; },
     waveT: 0, boingT: 0,
     wave() { api.waveT = 1; },
     boing() { api.boingT = 1; },
     dispose() {
       group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+      if (waist) waist.traverse?.((o) => { if (o.geometry) o.geometry.dispose(); });
       for (const m of Object.values(api.mats)) m.dispose();
     },
     /* internal animation state */
@@ -426,14 +530,16 @@ export function createDoll(cfg) {
       /* legs */
       const step = Math.sin(phase * Math.PI * 2);
       legL.hip.rotation.x = swing * 0.62 * w + step * 0.30 * b + Math.sin(t * 1.5) * 0.02 * (1 - energy);
-      legR.hip.rotation.x = -swing * 0.62 * w - step * 0.30 * b + Math.sin(t * 1.5 + 2) * 0.02 * (1 - energy);
+      legR2.hip.rotation.x = -swing * 0.62 * w - step * 0.30 * b + Math.sin(t * 1.5 + 2) * 0.02 * (1 - energy);
       legL.hip.rotation.z = -0.07 * b;
-      legR.hip.rotation.z = 0.07 * b;
+      legR2.hip.rotation.z = 0.07 * b;
 
-      /* skirt sway */
-      const sway = 1 + (0.05 * Math.sin(phase * Math.PI * 4) * b + 0.04 * Math.abs(swing) * w);
-      skirtGroup.scale.set(sway, 1, sway);
-      skirtGroup.rotation.z = Math.sin(phase * Math.PI * 2) * 0.07 * b + swing * 0.06 * w;
+      /* skirt sway (female) */
+      if (skirtGroup) {
+        const sway = 1 + (0.05 * Math.sin(phase * Math.PI * 4) * b + 0.04 * Math.abs(swing) * w);
+        skirtGroup.scale.set(sway, 1, sway);
+        skirtGroup.rotation.z = Math.sin(phase * Math.PI * 2) * 0.07 * b + swing * 0.06 * w;
+      }
 
       /* hair secondary motion */
       if (tailPivot) {
@@ -447,7 +553,7 @@ export function createDoll(cfg) {
 
       /* face */
       smile.scale.set(1 + 0.3 * b + 0.15 * waveA, 1 + 0.25 * b + 0.1 * waveA, 1);
-      blushMat.opacity = 0.55 + 0.3 * b;
+      blushMat.opacity = (male ? 0.3 : 0.55) + 0.3 * b;
       if (api._blinkAge >= 0) {
         api._blinkAge += dt;
         if (api._blinkAge > 0.22) api._blinkAge = -1;

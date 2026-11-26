@@ -1,13 +1,14 @@
 # 🍬 Trepio Candy World
 
-Dress up a doll, then step into an open **candy world**: explore the candy-cane
-maze, lollipop forest, chocolate river with donut crossings, ice-cream
-mountains, a giant cupcake — and find the **Star Candy** hidden at the maze
-center. Three NPC dolls wander the world and wave hello.
+Dress up your doll, then step into a **sweet fantasy world**: a candy-cane maze,
+lollipop forest, chocolate river under a rainbow, gumdrop village, gummy bears,
+cotton-candy trees, whipped-cream hills, a candy castle — and butterflies
+fluttering everywhere. Find the **Star Candy** hidden at the maze center.
+The other dolls live in the world as NPCs who wander around and wave hello.
 
 ## 🧸 Characters
 
-Five dolls, each with different characteristics:
+Eight dolls — girls and boys — each with different characteristics:
 
 | Doll | Title | Speed | Jump |
 |---|---|---|---|
@@ -16,9 +17,14 @@ Five dolls, each with different characteristics:
 | 🌿 Zuri | Mint Ranger | 6.2 | 4.2 |
 | 🫐 Lulu | Berry Dreamer | 5.0 | 4.7 |
 | 💫 Kiki | Vanilla Comet | 6.5 | 5.6 |
+| 🤴 Theo | Cocoa Prince | 5.4 | 4.8 |
+| 🍀 Amani | Mint Explorer | 5.1 | 5.2 |
+| ⚡ Dex | Lemon Bolt | 6.4 | 5.5 |
 
-Every doll is fully customizable (hair, outfit, colors, shoes, accessories)
-in the studio — your look is saved per character in `localStorage`.
+Every doll is fully customizable — hair, outfit (skirts for the girls,
+trousers for the boys), colors, shoes and accessories — and looks are saved
+per character in `localStorage`. When you play one doll, the other seven
+wander the world as NPCs.
 
 ## 🎮 Controls
 
@@ -52,11 +58,13 @@ Deploys to Vercel with the **Vite** preset. Live: https://trepio.vercel.app
 ## 🛠️ Tech
 
 - three.js r180 — the dolls are 100% procedural (spheres, capsules, lathes)
+- Male & female doll bodies from one factory (trousers attach to leg rigs)
 - Procedural maze (DFS backtracker, verified always solvable) with AABB collision
 - Third-person follow camera, jump physics, circle/box collision resolution
-- Instanced props (lollipop forest, gumdrops, marshmallows, maze walls)
+- 24 animated butterflies with orbiting free-flight paths & flapping wings
+- Candy castle, rainbow, gumdrop village, gummy bears, cream hills, cookie paths
 - WebAudio beatbox with two moods — ambient world music & dance beat
-- NPCs with simple wander/greet AI
+- NPCs with simple wander/greet AI (all non-player dolls populate the world)
 - Game features (objectives, collectibles, scoring) planned after review
 
 ## 📁 Files
