@@ -7,6 +7,10 @@ river, gumdrop village and a grand palace. Complete quests, meet the royal
 family, keep pets, and play arcade mini-games. Progress saves locally on your
 device and can be exported as a file.
 
+**3.0 "The Living Fantasy Kingdom"** begins the art overhaul: golden-morning
+lighting, a natural meadow palette, and a rebuilt timber-and-shingle village —
+candy as *accents*, not candy-everything.
+
 Built with [three.js](https://threejs.org) — a single static page, playable
 offline. **Live at <https://trepio.vercel.app>**.
 
@@ -102,6 +106,8 @@ Any static host works. This repo deploys on push to `main` via Vercel
 
 ## 🗺 Roadmap
 
-- **3.0** — art overhaul: *The Living Fantasy Kingdom* look, stylized 3D
-  realism, candy accents (not candy-everything), richer lighting.
+- **3.0 — art overhaul** (*Act I shipped*): golden-morning lighting with warm
+  fog, meadow-green palette, plaster-and-timber cottages with shingle roofs,
+  glowing windows, flower boxes and door lanterns, plus village footpaths.
+  *Act II (planned)*: the palace grounds and landmark props.
 - Later — islands, achievements, fashion shows, seasonal events.

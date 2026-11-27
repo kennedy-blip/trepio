@@ -59,18 +59,18 @@ function chocolateTex() {
     }
   }, 6, 1);
 }
-/* sprinkle "frosting grass" ground */
-function sprinkleTex(base = '#d5f0d8') {
-  const colors = ['#ff8fb7', '#ffd45e', '#63b8f5', '#a7d97a', '#b57de0', '#fff'];
+/* meadow ground: stylized green with sparse pastel candy dots */
+function sprinkleTex(base = '#a9c88f') {
+  const colors = ['#e8a9c0', '#f2d98a', '#a9c6e8', '#c4dfa4', '#d5b8e8', '#f7f3e8'];
   return canvasTex(512, 512, (ctx, w, h) => {
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, w, h);
     ctx.translate(w / 2, h / 2);
-    for (let i = 0; i < 340; i++) {
+    for (let i = 0; i < 150; i++) {
       ctx.save();
       ctx.rotate(Math.random() * Math.PI * 2);
       ctx.fillStyle = colors[(Math.random() * colors.length) | 0];
-      const len = 10 + Math.random() * 12, th = 4;
+      const len = 8 + Math.random() * 9, th = 3;
       ctx.beginPath();
       const x = (Math.random() - 0.5) * w * 1.1, y = (Math.random() - 0.5) * h * 1.1;
       ctx.roundRect ? ctx.roundRect(x, y, len, th, th / 2) : ctx.rect(x, y, len, th);
@@ -79,6 +79,38 @@ function sprinkleTex(base = '#d5f0d8') {
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }, 26, 26);
+}
+/* warm shingle rows for cottage roofs */
+function shingleTex() {
+  return canvasTex(128, 128, (ctx, w, h) => {
+    for (let row = 0; row < 8; row++) {
+      const y = row * 16;
+      ctx.fillStyle = row % 2 ? '#a8503c' : '#b3573f';
+      ctx.fillRect(0, y, w, 16);
+      ctx.fillStyle = 'rgba(60,28,18,0.35)';
+      ctx.fillRect(0, y + 14, w, 2);
+      for (let i = 0; i < 4; i++) {
+        const x = (row % 2) * 16 + i * 32 + (Math.random() * 6 - 3);
+        ctx.fillRect(x, y, 2, 16);
+      }
+    }
+  }, 2, 1);
+}
+/* wood planks for cottage doors */
+function plankTex() {
+  return canvasTex(128, 128, (ctx, w, h) => {
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = i % 2 ? '#82553a' : '#8f5f3e';
+      ctx.fillRect(i * 32, 0, 32, h);
+      ctx.fillStyle = 'rgba(40,20,10,0.5)';
+      ctx.fillRect(i * 32, 0, 2, h);
+    }
+    ctx.fillStyle = '#5e4326';
+    for (let i = 0; i < 4; i++) {
+      ctx.fillRect(i * 32 + 14, 20, 4, 4);
+      ctx.fillRect(i * 32 + 14, h - 24, 4, 4);
+    }
+  });
 }
 /* wooden sign text */
 function signTex(text, sub) {
@@ -266,7 +298,7 @@ export function createWorld(scene, keyLight) {
   const LOOPS = 64;
   const stemGeo = new THREE.CylinderGeometry(0.16, 0.2, 2.8, 10);
   const topGeo = new THREE.SphereGeometry(0.78, 16, 12);
-  const stems = new THREE.InstancedMesh(stemGeo, mat('#fff6ec', { roughness: 0.5 }), LOOPS);
+  const stems = new THREE.InstancedMesh(stemGeo, mat('#c9a06a', { roughness: 0.7 }), LOOPS);
   const tops = new THREE.InstancedMesh(topGeo, new THREE.MeshStandardMaterial({ roughness: 0.35 }), LOOPS);
   stems.castShadow = tops.castShadow = true;
   {
@@ -1337,38 +1369,120 @@ export function createWorld(scene, keyLight) {
   /* ---------------- NPC homes (enterable cottages) ---------------- */
   const homes = [];
   function buildHome(def) {
-    const { id, x, z, wall, roof, blanket, theme } = def;
-    /* --- exterior --- */
+    const { id, x, z, roof, blanket, theme } = def;
+    const accent = roof; /* the def's signature color lives on in the candy accents */
+    /* --- exterior: stylized fantasy cottage (plaster, half-timber, shingles) --- */
     const ext = new THREE.Group();
     ext.position.set(x, 0, z);
     const ry = Math.atan2(-x, 21 - z);
     ext.rotation.y = ry;
-    const body = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.6, 3.4), mat(wall, { roughness: 0.55 }));
+
+    const plasterMat = mat('#f4ead6', { roughness: 0.9 });
+    const beamMat = mat('#7a5b3a', { roughness: 0.7 });
+    const shingleMat = new THREE.MeshStandardMaterial({ map: shingleTex(), roughness: 0.75 });
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.6, 3.4), plasterMat);
     body.position.y = 1.3;
     body.castShadow = true;
     ext.add(body);
-    const roofM = new THREE.Mesh(new THREE.ConeGeometry(3.3, 1.7, 4), mat(roof, { roughness: 0.45 }));
+
+    /* stone base trim */
+    const baseTrim = new THREE.Mesh(new THREE.BoxGeometry(3.92, 0.3, 3.52), mat('#cbb89d', { roughness: 0.85 }));
+    baseTrim.position.y = 0.15;
+    ext.add(baseTrim);
+
+    /* half-timber corner posts + lintel over the door */
+    for (const [bx, bz] of [[-1.86, 1.66], [1.86, 1.66], [-1.86, -1.66], [1.86, -1.66]]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.6, 0.18), beamMat);
+      post.position.set(bx, 1.3, bz);
+      ext.add(post);
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.16, 0.12), beamMat);
+    lintel.position.set(0, 1.82, 1.73);
+    ext.add(lintel);
+
+    /* shingled pyramid roof + candy-stripe ridge finial (accent) */
+    const roofM = new THREE.Mesh(new THREE.ConeGeometry(3.3, 1.7, 4), shingleMat);
     roofM.position.y = 3.35;
     roofM.rotation.y = Math.PI / 4;
     roofM.castShadow = true;
     ext.add(roofM);
-    const door = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.7, 0.14), mat('#8a5a3a', { roughness: 0.5 }));
+    const finial = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.55, 8), mat(accent, { roughness: 0.4 }));
+    finial.position.y = 4.28;
+    finial.castShadow = true;
+    ext.add(finial);
+
+    /* door: plank texture + painted accent frame + gold knob + stone step */
+    const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(1.22, 1.88, 0.1), mat(accent, { roughness: 0.6 }));
+    doorFrame.position.set(0, 0.94, 1.68);
+    ext.add(doorFrame);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.7, 0.14),
+      new THREE.MeshStandardMaterial({ map: plankTex(), roughness: 0.7 }));
     door.position.set(0, 0.85, 1.73);
     ext.add(door);
     const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), mat('#ffd45e', { metalness: 0.6 }));
     knob.position.set(0.32, 0.85, 1.82);
     ext.add(knob);
+    const step = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.12, 0.5), mat('#b9ac97', { roughness: 0.9 }));
+    step.position.set(0, 0.06, 2.0);
+    step.receiveShadow = true;
+    ext.add(step);
+
+    /* windows: warm glow + wood casement + accent shutters + flower box */
     for (const s of [-1, 1]) {
-      const win = new THREE.Mesh(new THREE.CircleGeometry(0.34, 16), new THREE.MeshStandardMaterial({ color: '#fff3b8', emissive: '#ffd45e', emissiveIntensity: 0.4 }));
+      const win = new THREE.Mesh(new THREE.CircleGeometry(0.34, 16), new THREE.MeshStandardMaterial({ color: '#fff3b8', emissive: '#ffd45e', emissiveIntensity: 0.45 }));
       win.position.set(s * 1.15, 1.5, 1.715);
       ext.add(win);
-      const frame = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.045, 8, 18), mat('#fff6ec'));
+      const frame = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.05, 8, 18), beamMat);
       frame.position.copy(win.position);
       ext.add(frame);
+      /* muntin cross */
+      const mH = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.04, 0.03), beamMat);
+      mH.position.set(s * 1.15, 1.5, 1.72);
+      ext.add(mH);
+      const mV = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.62, 0.03), beamMat);
+      mV.position.set(s * 1.15, 1.5, 1.72);
+      ext.add(mV);
+      /* shutters */
+      for (const k of [-1, 1]) {
+        const sh = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.66, 0.06), mat(accent, { roughness: 0.65 }));
+        sh.position.set(s * 1.15 + k * 0.44, 1.5, 1.71);
+        ext.add(sh);
+      }
+      /* flower box + candy blossoms */
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.16, 0.18), beamMat);
+      box.position.set(s * 1.15, 1.06, 1.76);
+      ext.add(box);
+      for (let f = 0; f < 3; f++) {
+        const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6),
+          mat(f === 1 ? '#fff6ec' : accent, { roughness: 0.5 }));
+        bloom.position.set(s * 1.15 + (f - 1) * 0.22, 1.18, 1.78);
+        ext.add(bloom);
+      }
     }
-    const chim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.1, 0.5), mat('#fdf0f6', { roughness: 0.6 }));
-    chim.position.set(1.2, 3.4, -0.8);
+
+    /* door lantern: bracket + warm glowing lamp */
+    {
+      const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.26), beamMat);
+      bracket.position.set(-0.72, 2.1, 1.72);
+      ext.add(bracket);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.1, 8), mat('#4a3a2a', { roughness: 0.6 }));
+      cap.position.set(-0.72, 1.94, 1.84);
+      ext.add(cap);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8),
+        new THREE.MeshStandardMaterial({ color: '#ffd9a0', emissive: '#ffb85e', emissiveIntensity: 0.9, roughness: 0.4 }));
+      lamp.position.set(-0.72, 1.83, 1.84);
+      ext.add(lamp);
+    }
+
+    /* chimney: warm stone with a cap */
+    const chim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.6, 0.5), mat('#b09a85', { roughness: 0.85 }));
+    chim.position.set(1.2, 3.7, -0.8);
     ext.add(chim);
+    const chimTop = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.14, 0.62), mat('#8f7d6b', { roughness: 0.85 }));
+    chimTop.position.set(1.2, 4.56, -0.8);
+    ext.add(chimTop);
+
     group.add(ext);
     circles.push({ x, z, r: 2.45 });
     const doorX = x + Math.sin(ry) * 2.2;
@@ -1579,6 +1693,30 @@ export function createWorld(scene, keyLight) {
       } } },
   ];
   for (const d of HOME_DEFS) homes.push(buildHome(d));
+
+  /* ---------------- village footpaths (visual only, no colliders) ---------------- */
+  {
+    const pathMat = mat('#d8c8a2', { roughness: 0.95 });
+    const pathGeo = new THREE.CircleGeometry(0.75, 14);
+    const cx = 0, cz = 21; /* village green */
+    for (const h of homes) {
+      const dx = cx - h.door.x, dz = cz - h.door.z;
+      for (let i = 1; i <= 3; i++) {
+        const t = i / 4;
+        const p = new THREE.Mesh(pathGeo, pathMat);
+        p.rotation.x = -Math.PI / 2;
+        p.position.set(h.door.x + dx * t + (Math.random() - 0.5) * 0.3, 0.013,
+                       h.door.z + dz * t + (Math.random() - 0.5) * 0.3);
+        p.receiveShadow = true;
+        group.add(p);
+      }
+    }
+    const plaza = new THREE.Mesh(new THREE.CircleGeometry(3.2, 24), pathMat);
+    plaza.rotation.x = -Math.PI / 2;
+    plaza.position.set(cx, 0.012, cz);
+    plaza.receiveShadow = true;
+    group.add(plaza);
+  }
 
   /* ---------------- arcade stands (mini-games) ---------------- */
   const arcades = [];
