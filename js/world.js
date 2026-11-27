@@ -59,26 +59,128 @@ function chocolateTex() {
     }
   }, 6, 1);
 }
-/* meadow ground: stylized green with sparse pastel candy dots */
-function sprinkleTex(base = '#a9c88f') {
-  const colors = ['#e8a9c0', '#f2d98a', '#a9c6e8', '#c4dfa4', '#d5b8e8', '#f7f3e8'];
+/* ---------- realistic value noise (for grass / stone) ---------- */
+function _hash2(x, y) {
+  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+function _vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = _hash2(xi, yi), b = _hash2(xi + 1, yi), c = _hash2(xi, yi + 1), d = _hash2(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function _fbm(x, y) {
+  let v = 0, amp = 0.5, f = 1;
+  for (let o = 0; o < 4; o++) { v += amp * _vnoise(x * f, y * f); amp *= 0.5; f *= 2; }
+  return v; /* ~0..1 */
+}
+/* realistic meadow grass: fbm clumping, blade strokes, sparse candy dots */
+function sprinkleTex() {
   return canvasTex(512, 512, (ctx, w, h) => {
-    ctx.fillStyle = base;
-    ctx.fillRect(0, 0, w, h);
-    ctx.translate(w / 2, h / 2);
-    for (let i = 0; i < 150; i++) {
-      ctx.save();
-      ctx.rotate(Math.random() * Math.PI * 2);
-      ctx.fillStyle = colors[(Math.random() * colors.length) | 0];
-      const len = 8 + Math.random() * 9, th = 3;
-      ctx.beginPath();
-      const x = (Math.random() - 0.5) * w * 1.1, y = (Math.random() - 0.5) * h * 1.1;
-      ctx.roundRect ? ctx.roundRect(x, y, len, th, th / 2) : ctx.rect(x, y, len, th);
-      ctx.fill();
-      ctx.restore();
+    const img = ctx.createImageData(w, h);
+    const d = img.data;
+    /* green ramp: cool shadow green -> warm sunlit olive */
+    const c0 = [74, 104, 58], c1 = [148, 164, 96], cw = [138, 122, 82];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const n = _fbm(x / 46, y / 46);          /* large clumps */
+        const n2 = _fbm(x / 7 + 40, y / 7 + 40); /* fine grain */
+        let r = c0[0] + (c1[0] - c0[0]) * n + (n2 - 0.5) * 26;
+        let g = c0[1] + (c1[1] - c0[1]) * n + (n2 - 0.5) * 30;
+        let b = c0[2] + (c1[2] - c0[2]) * n + (n2 - 0.5) * 20;
+        /* warm earthy patches */
+        const p = _fbm(x / 90 + 200, y / 90 + 200);
+        if (p > 0.62) {
+          const k = Math.min(1, (p - 0.62) * 3);
+          r += (cw[0] - r) * k * 0.5; g += (cw[1] - g) * k * 0.5; b += (cw[2] - b) * k * 0.5;
+        }
+        const i = (y * w + x) * 4;
+        d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255;
+      }
     }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-  }, 26, 26);
+    ctx.putImageData(img, 0, 0);
+    /* grass blade strokes */
+    for (let i = 0; i < 900; i++) {
+      const x = Math.random() * w, y = Math.random() * h;
+      const len = 4 + Math.random() * 7, a = (Math.random() - 0.5) * 0.9;
+      const dark = Math.random() < 0.5;
+      ctx.strokeStyle = dark ? 'rgba(52,78,40,0.30)' : 'rgba(168,190,110,0.30)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.sin(a) * len, y - Math.cos(a) * len);
+      ctx.stroke();
+    }
+    /* sparse tiny candy dots (the fantasy accent) */
+    const colors = ['#e8a9c0', '#f2d98a', '#a9c6e8', '#d5b8e8'];
+    for (let i = 0; i < 60; i++) {
+      ctx.fillStyle = colors[(Math.random() * colors.length) | 0];
+      ctx.beginPath();
+      ctx.arc(Math.random() * w, Math.random() * h, 1.6 + Math.random() * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }, 30, 30);
+}
+/* worn stone path texture */
+function stoneTex() {
+  return canvasTex(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#cbb894';
+    ctx.fillRect(0, 0, w, h);
+    /* mortar noise */
+    for (let i = 0; i < 400; i++) {
+      ctx.fillStyle = `rgba(120,100,70,${Math.random() * 0.25})`;
+      ctx.fillRect(Math.random() * w, Math.random() * h, 3, 3);
+    }
+    /* rounded flagstones */
+    const rows = 4;
+    for (let ry = 0; ry < rows; ry++) {
+      const y = 16 + ry * 62;
+      const off = (ry % 2) * 34;
+      for (let rx = -1; rx < 4; rx++) {
+        const x = 34 + rx * 68 + off;
+        const rr = 26 + _hash2(rx, ry) * 6;
+        const n = _fbm(rx * 3, ry * 3);
+        const base = 150 + n * 40;
+        ctx.fillStyle = `rgb(${base + 18},${base + 6},${base - 18})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, rr, rr * 0.8, _hash2(rx + 9, ry) * 0.8 - 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        /* stone shading edge */
+        ctx.strokeStyle = 'rgba(70,55,38,0.45)';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        /* moss flecks */
+        ctx.fillStyle = 'rgba(110,130,70,0.35)';
+        for (let m = 0; m < 5; m++) {
+          ctx.beginPath();
+          ctx.arc(x + (Math.random() - 0.5) * rr, y + (Math.random() - 0.5) * rr * 0.8, 2 + Math.random() * 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }, 1, 1);
+}
+/* tree bark texture */
+function barkTex() {
+  return canvasTex(128, 128, (ctx, w, h) => {
+    for (let x = 0; x < w; x += 1) {
+      const n = _fbm(x / 9, 0.5);
+      const b = 78 + n * 50;
+      ctx.fillStyle = `rgb(${b + 20},${b - 4},${b - 26})`;
+      ctx.fillRect(x, 0, 1, h);
+    }
+    for (let i = 0; i < 26; i++) {
+      ctx.strokeStyle = 'rgba(40,26,14,0.5)';
+      ctx.lineWidth = 1 + Math.random() * 2;
+      const x = Math.random() * w;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.bezierCurveTo(x + 6, h / 3, x - 6, h * 2 / 3, x + 3, h);
+      ctx.stroke();
+    }
+  }, 2, 1);
 }
 /* lollipop swirl for palace toppers & discs */
 function swirlTex() {
@@ -179,6 +281,7 @@ export function createWorld(scene, keyLight) {
 
   const boxes = [];    // AABB colliders {minX,maxX,minZ,maxZ}
   const circles = [];  // round colliders {x,z,r}
+  const swayTrees = []; // realistic tree canopies (wind sway)
   const R_BOUND = 50;  // world radius
 
   const stripes = stripeTex();
@@ -475,7 +578,7 @@ export function createWorld(scene, keyLight) {
   /* ---------------- chocolate river + donut stones ---------------- */
   const riverTex = chocolateTex();
   const river = new THREE.Mesh(new THREE.PlaneGeometry(R_BOUND * 2 + 30, 5.4),
-    new THREE.MeshStandardMaterial({ map: riverTex, roughness: 0.25, metalness: 0.05 }));
+    new THREE.MeshStandardMaterial({ map: riverTex, roughness: 0.12, metalness: 0.12 }));
   river.rotation.x = -Math.PI / 2;
   river.position.set(0, 0.025, 32);
   group.add(river);
@@ -882,27 +985,71 @@ export function createWorld(scene, keyLight) {
   gummyBear(21, 13, '#b57de0');
   gummyBear(-5, 31, '#ff9e4f');
 
-  /* ---------------- cotton candy trees ---------------- */
+  /* ---------------- realistic trees (bark + layered canopies, wind sway) ---------------- */
   {
-    const trunkGeo = new THREE.CylinderGeometry(0.28, 0.38, 2.6, 10);
-    const trunkMat = mat('#c9a06a', { roughness: 0.85 });
-    const fluffMats = ['#ffd9e6', '#fff0f6', '#e4d9f7', '#d9ecf7'].map((c) => mat(c, { roughness: 1 }));
+    const trunkMat = new THREE.MeshStandardMaterial({ map: barkTex(), roughness: 0.9 });
+    const leafCols = ['#4d7a39', '#5d8a46', '#6f9a52', '#87a95e', '#3f6d33'];
     const spots = [[-30, 30], [30, 33], [-34, -8], [36, -2], [-6, 40], [20, 41], [-40, 34], [42, 18], [8, -34], [-13, -33]];
     spots.forEach(([x, z], i) => {
-      const t = new THREE.Mesh(trunkGeo, trunkMat);
-      t.position.set(x, 1.3, z);
+      const s = 0.9 + _hash2(x, z) * 0.5;
+      /* trunk with a slight lean */
+      const trunkH = 2.6 * s;
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * s, 0.32 * s, trunkH, 10), trunkMat);
+      trunk.position.set(x, trunkH / 2, z);
+      trunk.rotation.z = (_hash2(z, x) - 0.5) * 0.08;
+      trunk.castShadow = true;
+      group.add(trunk);
+      /* layered canopy: 4-5 blobs, varied greens */
+      const canopy = new THREE.Group();
+      canopy.position.set(x, trunkH + 0.4 * s, z);
+      const blobs = 4 + ((_hash2(x * 3, z * 3) * 2) | 0);
+      for (let k = 0; k < blobs; k++) {
+        const a = (k / blobs) * Math.PI * 2 + _hash2(k, x);
+        const rr = (0.7 + _hash2(k + 5, z) * 0.5) * s;
+        const blob = new THREE.Mesh(new THREE.SphereGeometry(0.95 * s, 12, 10),
+          mat(leafCols[(k + i) % leafCols.length], { roughness: 0.85 }));
+        blob.position.set(Math.cos(a) * 0.6 * s, 0.25 * s + _hash2(k, 2) * 0.5 * s, Math.sin(a) * 0.6 * s);
+        blob.scale.set(1, 0.82 + _hash2(k, 7) * 0.25, 1);
+        blob.castShadow = true;
+        canopy.add(blob);
+      }
+      group.add(canopy);
+      swayTrees.push({ c: canopy, phase: _hash2(x, z) * 6 });
+      circles.push({ x, z, r: 0.75 });
+    });
+    /* keep three cotton-candy trees as fantasy accents */
+    const fluffMats = ['#ffd9e6', '#fff0f6', '#e4d9f7'].map((c) => mat(c, { roughness: 1 }));
+    for (const [x, z, fi] of [[-38, 20, 0], [34, 36, 1], [16, -36, 2]]) {
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.34, 2.4, 10), mat('#c9a06a', { roughness: 0.85 }));
+      t.position.set(x, 1.2, z);
       t.castShadow = true;
       group.add(t);
-      const fm = fluffMats[i % fluffMats.length];
-      const puffs = [[0, 3.1, 0, 1.15], [0.7, 2.8, 0.3, 0.75], [-0.65, 2.9, -0.25, 0.8], [0.1, 3.7, -0.1, 0.7]];
-      for (const [ox, oy, oz, sc] of puffs) {
-        const p = new THREE.Mesh(new THREE.SphereGeometry(0.95, 12, 10), fm);
+      for (const [ox, oy, oz, sc] of [[0, 2.9, 0, 1.05], [0.6, 2.6, 0.3, 0.7], [-0.55, 2.7, -0.2, 0.75]]) {
+        const p = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 10), fluffMats[fi]);
         p.position.set(x + ox, oy, z + oz);
         p.scale.setScalar(sc);
         group.add(p);
       }
-      circles.push({ x, z, r: 0.75 });
-    });
+      circles.push({ x, z, r: 0.7 });
+    }
+  }
+
+  /* ---------------- scattered rocks ---------------- */
+  {
+    const rockMat = mat('#8d8578', { roughness: 0.95 });
+    const rockGeo = new THREE.DodecahedronGeometry(0.5, 0);
+    const spots = [[-26, 8], [24, 9], [-36, 26], [38, 26], [-28, -24], [30, -28], [-9, -30], [44, 8], [-46, 2], [18, -38], [-20, 38], [12, 42]];
+    for (const [x, z] of spots) {
+      const r = new THREE.Mesh(rockGeo, rockMat);
+      const s = 0.5 + _hash2(x, z) * 0.7;
+      r.scale.set(s, s * (0.6 + _hash2(z, x) * 0.4), s);
+      r.position.set(x, 0.18 * s, z);
+      r.rotation.set(_hash2(x, 3) * 3, _hash2(z, 5) * 6, _hash2(x, 9) * 3);
+      r.castShadow = true;
+      r.receiveShadow = true;
+      group.add(r);
+      circles.push({ x, z, r: 0.55 * s });
+    }
   }
 
   /* ---------------- whipped cream hills ---------------- */
@@ -1858,7 +2005,7 @@ export function createWorld(scene, keyLight) {
 
   /* ---------------- village footpaths (visual only, no colliders) ---------------- */
   {
-    const pathMat = mat('#d8c8a2', { roughness: 0.95 });
+    const pathMat = new THREE.MeshStandardMaterial({ map: stoneTex(), roughness: 0.9 });
     const pathGeo = new THREE.CircleGeometry(0.75, 14);
     const cx = 0, cz = 21; /* village green */
     for (const h of homes) {
@@ -1873,7 +2020,11 @@ export function createWorld(scene, keyLight) {
         group.add(p);
       }
     }
-    const plaza = new THREE.Mesh(new THREE.CircleGeometry(3.2, 24), pathMat);
+    const plazaMat = pathMat.clone();
+    plazaMat.map = pathMat.map.clone();
+    plazaMat.map.needsUpdate = true;
+    plazaMat.map.repeat.set(3, 3);
+    const plaza = new THREE.Mesh(new THREE.CircleGeometry(3.2, 24), plazaMat);
     plaza.rotation.x = -Math.PI / 2;
     plaza.position.set(cx, 0.012, cz);
     plaza.receiveShadow = true;
@@ -2091,6 +2242,12 @@ export function createWorld(scene, keyLight) {
       gemRespawn = 30;
     },
     update(dt, t) {
+      /* living world: tree sway + flowing river */
+      for (const tr of swayTrees) {
+        tr.c.rotation.z = Math.sin(t * 0.7 + tr.phase) * 0.03;
+        tr.c.rotation.x = Math.cos(t * 0.5 + tr.phase * 1.3) * 0.02;
+      }
+      riverTex.offset.x = (riverTex.offset.x + dt * 0.03) % 1;
       gem.rotation.y += dt * 1.4;
       gem.position.y = 1.35 + Math.sin(t * 1.8) * 0.18;
       if (!gemActive) {
