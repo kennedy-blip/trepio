@@ -1900,7 +1900,7 @@ export function createWorld(scene, keyLight) {
     light.position.set(0, 2.6, -1.2);
     ig.add(light);
     return {
-      id, npc: id,
+      id, npc: id, family: def.family || null,
       pos: new THREE.Vector3(x, 0, z),
       door: new THREE.Vector3(doorX, 0, doorZ),
       exit: new THREE.Vector3(x + Math.sin(ry) * 2.9, 0, z + Math.cos(ry) * 2.9),
@@ -1909,6 +1909,93 @@ export function createWorld(scene, keyLight) {
       npcSpot: new THREE.Vector3(1.6, 0, 1.4),
     };
   }
+  /* nursery prop for the family homes: crib + mobile + toys + teddy */
+  function familyProp(cribColor, teddyColor) {
+    return (ig, mat, T, boxes, circles) => {
+      const wood = mat('#a5713f', { roughness: 0.5 });
+      const g = new T.Group();
+      /* crib */
+      const base = new T.Mesh(new T.BoxGeometry(1.05, 0.14, 0.72), wood);
+      base.position.set(0, 0.38, 0);
+      g.add(base);
+      const mattress = new T.Mesh(new T.BoxGeometry(0.95, 0.1, 0.62), mat('#fff6ec'));
+      mattress.position.set(0, 0.49, 0);
+      g.add(mattress);
+      const blanket = new T.Mesh(new T.BoxGeometry(0.6, 0.07, 0.58), mat(cribColor, { roughness: 0.6 }));
+      blanket.position.set(-0.16, 0.55, 0);
+      g.add(blanket);
+      const pillow = new T.Mesh(new T.BoxGeometry(0.26, 0.09, 0.4), mat('#fdf0f6'));
+      pillow.position.set(0.34, 0.55, 0);
+      g.add(pillow);
+      /* corner posts + side rails */
+      for (const [px, pz] of [[-0.5, -0.34], [0.5, -0.34], [-0.5, 0.34], [0.5, 0.34]]) {
+        const post = new T.Mesh(new T.CylinderGeometry(0.045, 0.045, 0.85, 10), wood);
+        post.position.set(px, 0.42, pz);
+        g.add(post);
+      }
+      for (const s of [-1, 1]) {
+        const rail = new T.Mesh(new T.BoxGeometry(1.0, 0.07, 0.05), wood);
+        rail.position.set(0, 0.62, s * 0.34);
+        g.add(rail);
+        const rail2 = new T.Mesh(new T.BoxGeometry(0.05, 0.34, 0.62), wood);
+        rail2.position.set(s * 0.5, 0.5, 0);
+        g.add(rail2);
+      }
+      /* mobile above the crib */
+      const arm = new T.Mesh(new T.CylinderGeometry(0.015, 0.015, 0.5, 6), wood);
+      arm.position.set(0, 1.25, 0);
+      g.add(arm);
+      const ring = new T.Mesh(new T.TorusGeometry(0.16, 0.02, 8, 20), mat('#ffd45e'));
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(0, 1.5, 0);
+      g.add(ring);
+      const MOB_COLS = ['#ff8fb7', '#63b8f5', '#a7d97a'];
+      MOB_COLS.forEach((c, i) => {
+        const a = (i / 3) * Math.PI * 2;
+        const star = new T.Mesh(new T.ConeGeometry(0.05, 0.1, 6), mat(c));
+        star.position.set(Math.cos(a) * 0.16, 1.38, Math.sin(a) * 0.16);
+        g.add(star);
+      });
+      g.position.set(2.7, 0, 1.5);
+      g.rotation.y = -Math.PI / 2;
+      ig.add(g);
+      circles.push({ x: 2.7, z: 1.5, r: 0.85 });
+      /* toy blocks */
+      const BLOCK_COLS = ['#f45d8e', '#ffd45e', '#63b8f5'];
+      for (let i = 0; i < 4; i++) {
+        const b = new T.Mesh(new T.BoxGeometry(0.16, 0.16, 0.16),
+          mat(BLOCK_COLS[i % 3], { roughness: 0.5 }));
+        b.position.set(1.95 + (i % 2) * 0.22, 0.08 + ((i / 2) | 0) * 0.17, 0.9 + (i % 2) * 0.14);
+        b.rotation.y = i * 0.5;
+        ig.add(b);
+      }
+      /* teddy bear */
+      {
+        const td = new T.Group();
+        const tm = mat(teddyColor, { roughness: 0.7 });
+        const body = new T.Mesh(new T.SphereGeometry(0.09, 10, 8), tm);
+        body.scale.set(1, 1.15, 0.9);
+        td.add(body);
+        const head = new T.Mesh(new T.SphereGeometry(0.065, 10, 8), tm);
+        head.position.y = 0.12;
+        td.add(head);
+        for (const s of [-1, 1]) {
+          const ear = new T.Mesh(new T.SphereGeometry(0.025, 8, 6), tm);
+          ear.position.set(s * 0.045, 0.17, 0);
+          td.add(ear);
+        }
+        td.position.set(2.1, 0.09, 2.0);
+        td.rotation.y = -1.2;
+        ig.add(td);
+      }
+      /* soft play rug */
+      const play = new T.Mesh(new T.CircleGeometry(0.9, 20), mat('#fdf0f6', { roughness: 0.95 }));
+      play.rotation.x = -Math.PI / 2;
+      play.position.set(2.2, 0.014, 1.1);
+      ig.add(play);
+    };
+  }
+
   const HOME_DEFS = [
     { id: 'zuri', x: 22.5, z: 14, wall: '#c8ecc0', roof: '#4fc3ae', blanket: '#a7d97a',
       theme: { wall: '#e5f6e0', rug: '#a7d97a', prop(ig, mat, T, boxes, circles) {
@@ -2001,6 +2088,21 @@ export function createWorld(scene, keyLight) {
         }
       } } },
   ];
+  /* ---- family homes (full families live here, babies included) ---- */
+  HOME_DEFS.push(
+    { id: 'berrywhistle', x: -32, z: 24, family: 'The Berrywhistles',
+      wall: '#f4d7e3', roof: '#b56a8f', blanket: '#e8a9c0',
+      theme: { wall: '#f7e8ef', rug: '#e8a9c0', prop: familyProp('#e8a9c0', '#c9a06a') } },
+    { id: 'gumdropp', x: 32, z: 38, family: 'The Gumdropps',
+      wall: '#dff0d5', roof: '#7fae62', blanket: '#c4dfa4',
+      theme: { wall: '#eaf5e4', rug: '#a7d97a', prop: familyProp('#c4dfa4', '#8f5f42') } },
+    { id: 'mintwhisk', x: 26, z: 2, family: 'The Mintwhisks',
+      wall: '#d9ecf7', roof: '#5b9bc4', blanket: '#bcd4ee',
+      theme: { wall: '#e8f3fa', rug: '#a9c6e8', prop: familyProp('#bcd4ee', '#a5713f') } },
+    { id: 'cocoabean', x: -28, z: 0, family: 'The Cocoabeans',
+      wall: '#f0e0d0', roof: '#a5713f', blanket: '#d9a066',
+      theme: { wall: '#f5ebe0', rug: '#c9a06a', prop: familyProp('#d9a066', '#6b4226') } },
+  );
   for (const d of HOME_DEFS) homes.push(buildHome(d));
 
   /* ---------------- village footpaths (visual only, no colliders) ---------------- */
@@ -2009,6 +2111,7 @@ export function createWorld(scene, keyLight) {
     const pathGeo = new THREE.CircleGeometry(0.75, 14);
     const cx = 0, cz = 21; /* village green */
     for (const h of homes) {
+      if (h.family) continue; /* family homes sit far out — doorstep pads only */
       const dx = cx - h.door.x, dz = cz - h.door.z;
       for (let i = 1; i <= 3; i++) {
         const t = i / 4;
@@ -2016,6 +2119,21 @@ export function createWorld(scene, keyLight) {
         p.rotation.x = -Math.PI / 2;
         p.position.set(h.door.x + dx * t + (Math.random() - 0.5) * 0.3, 0.013,
                        h.door.z + dz * t + (Math.random() - 0.5) * 0.3);
+        p.receiveShadow = true;
+        group.add(p);
+      }
+    }
+    /* doorstep pads for the far-flung family homes */
+    for (const h of homes) {
+      if (!h.family) continue;
+      const ox = h.door.x - h.pos.x, oz = h.door.z - h.pos.z;
+      const L = Math.hypot(ox, oz) || 1;
+      for (let i = 1; i <= 2; i++) {
+        const t = i / 3;
+        const p = new THREE.Mesh(pathGeo, pathMat);
+        p.rotation.x = -Math.PI / 2;
+        p.position.set(h.door.x + (ox / L) * 1.2 * t + (Math.random() - 0.5) * 0.2, 0.013,
+                       h.door.z + (oz / L) * 1.2 * t + (Math.random() - 0.5) * 0.2);
         p.receiveShadow = true;
         group.add(p);
       }
