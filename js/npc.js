@@ -6,6 +6,7 @@ import { ctx, $ } from './ctx.js';
 import { createDoll } from './doll.js';
 import { resolveWorldCollisions, resolveBoxCircle, resolveCastleCollisions, lerpAngle } from './collide.js';
 import { RACE_PAR } from './quests.js';
+import { getActiveHome } from './homes.js';
 
 /* ------------------------------------------------------------------ */
 /* Dialogue                                                            */
@@ -289,6 +290,291 @@ export function nearestNpc() {
     if (d2 < bestD) { bestD = d2; best = n; }
   }
   return best;
+}
+
+/* ------------------------------------------------------------------ */
+/* Family homes: parents + babies, mostly indoors, full interaction    */
+/* ------------------------------------------------------------------ */
+export const families = [];
+const BABY_SCALE = 0.55;
+const FAMILY_DEFS = [
+  { home: 'berrywhistle', label: 'The Berrywhistles', members: [
+    { id: 'bo', kind: 'parent', emoji: '🫐', name: 'Bo Berrywhistle', spot: [-1.4, 0.9],
+      cfg: { gender: 'male', hair: 'mshort', hairColor: '#4a3524', skin: '#8f5f42', eyes: '#3a2a1e',
+        outfit: 'explorer', top: '#5e7a9b', skirt: '#6b4a33', shoes: 'boots', shoeColor: '#4a3a2a',
+        accessories: { bow: false, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      lines: ['Little Bibi keeps us on our toes — and up at night!',
+        'We moved out here for the quiet. And the berries, of course.',
+        'Bella bakes a berry tart every Sunday. You are welcome to imagine a slice.',
+        'The toddlers in this house rule everything. We just live here.',
+        'Shh — the baby naps right after her bottle. Usually. Sometimes.'],
+      about: 'Bibi just took her first steps! Three of them. Then a very soft landing.' },
+    { id: 'bella', kind: 'parent', emoji: '🧺', name: 'Bella Berrywhistle', spot: [0.9, 1.7],
+      cfg: { gender: 'female', hair: 'long', hairColor: '#6b4226', skin: '#b5714f', eyes: '#5a3420',
+        outfit: 'coord', top: '#e8a9c0', skirt: '#f4d7e3', shoes: 'flats', shoeColor: '#a5713f',
+        accessories: { bow: true, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      lines: ['A basket of berries, a warm hearth, my family — what else does anyone need?',
+        'Bibi has Bo wrapped around her tiny finger. Both of them, really.',
+        'Careful where you step — blocks everywhere. It is a law of nature.',
+        'I just rocked Bibi to sleep. If she wakes, I am blaming you!',
+        'The forest past the river has the sweetest blackberries this season.'],
+      about: 'Bibi said her first word last week. It was "berry". We are very proud.' },
+    { id: 'bibi', kind: 'baby', emoji: '👶', name: 'Baby Bibi', spot: [2.3, 1.0],
+      cfg: { gender: 'female', hair: 'buns', hairColor: '#4a3524', skin: '#b5714f', eyes: '#5a3420',
+        outfit: 'party', top: '#f4d7e3', skirt: '#e8a9c0', shoes: 'flats', shoeColor: '#f4d7e3',
+        accessories: { bow: true, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      babble: ['Goo goo gah!', 'Ba-ba-ba-ba!', '*happy baby noises*', 'Mama! Dada! ...Candy!', '*giggles and claps*'] },
+  ] },
+  { home: 'gumdropp', label: 'The Gumdropps', members: [
+    { id: 'gus', kind: 'parent', emoji: '🍬', name: 'Gus Gumdropp', spot: [-1.4, 0.9],
+      cfg: { gender: 'male', hair: 'quiff', hairColor: '#2f2a26', skin: '#704b36', eyes: '#2f2420',
+        outfit: 'smart', top: '#7fae62', skirt: '#4a5a3a', shoes: 'boots', shoeColor: '#3a3a2a',
+        accessories: { bow: true, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      lines: ['Twins, friend. TWINS. I have not slept since spring.',
+        'Our garden grows actual gumdrops. The kids eat the profits.',
+        'Greta says the twins get their energy from me. I choose to be flattered.',
+        'Poppy hoards blocks. Pip hoards trouble. Perfect balance.',
+        'Stop by any time — kettle is always warm in this house.'],
+      about: 'Poppy stacked six blocks yesterday. Pip knocked them over in half a second. Teamwork.' },
+    { id: 'greta', kind: 'parent', emoji: '🍯', name: 'Greta Gumdropp', spot: [0.9, 1.7],
+      cfg: { gender: 'female', hair: 'ponytail', hairColor: '#8f5f42', skin: '#704b36', eyes: '#3a2a1e',
+        outfit: 'coord', top: '#c4dfa4', skirt: '#7fae62', shoes: 'flats', shoeColor: '#a5713f',
+        accessories: { bow: false, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      lines: ['Twins double the joy. And the laundry. Mostly the laundry.',
+        'Honey tea? I just put the kettle on. Sit, sit!',
+        'Pip learned to climb the crib rail. My heart is not ready.',
+        'Gus snores, the babies cry, and I would not trade a single second.',
+        'The bees by the meadow make the best honey in the kingdom.'],
+      about: 'Poppy and Pip were born four minutes apart. Pip arrived like a little thunderstorm.' },
+    { id: 'poppy', kind: 'baby', emoji: '👶', name: 'Baby Poppy', spot: [2.5, 1.6],
+      cfg: { gender: 'female', hair: 'buns', hairColor: '#2f2a26', skin: '#704b36', eyes: '#3a2a1e',
+        outfit: 'party', top: '#c4dfa4', skirt: '#dff0d5', shoes: 'flats', shoeColor: '#dff0d5',
+        accessories: { bow: true, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      babble: ['Ba!', 'Bee-bee-bee!', '*stacks a block proudly*', 'Dada, up! UP!', '*baby giggles*'] },
+    { id: 'pip', kind: 'baby', emoji: '👶', name: 'Baby Pip', spot: [2.0, 0.5],
+      cfg: { gender: 'male', hair: 'mshort', hairColor: '#2f2a26', skin: '#704b36', eyes: '#2f2420',
+        outfit: 'sporty', top: '#a9c6e8', skirt: '#5b9bc4', shoes: 'boots', shoeColor: '#3a3a2a',
+        accessories: { bow: false, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      babble: ['GOO!', 'Nyah nyah!', '*knocks over a block tower*', 'Mama! Ma-ma!', '*mischievous giggle*'] },
+  ] },
+  { home: 'mintwhisk', label: 'The Mintwhisks', members: [
+    { id: 'milo', kind: 'parent', emoji: '🌿', name: 'Milo Mintwhisk', spot: [-1.4, 0.9],
+      cfg: { gender: 'male', hair: 'sidepart', hairColor: '#5e4326', skin: '#c98a5f', eyes: '#3a2a1e',
+        outfit: 'explorer', top: '#5b9bc4', skirt: '#3a5a6a', shoes: 'boots', shoeColor: '#3a3a2a',
+        accessories: { bow: false, crown: false, glasses: true, wings: false, halo: false, wand: false } },
+      lines: ['I catalogue every herb in the kingdom. Miu catalogues every spoon in the house.',
+        'Mint tea before bed, mint tea after breakfast. We are a focused family.',
+        'Our Miu has opinions. Strong ones. Mostly about spoons.',
+        'Mimi says I dote. I say the baby learned it from somewhere.',
+        'A quiet house on the meadow — best decision we ever made.'],
+      about: 'Miu can name three herbs already. She points at mint and shouts "MMMH!". Close enough.' },
+    { id: 'mimi', kind: 'parent', emoji: '🍵', name: 'Mimi Mintwhisk', spot: [0.9, 1.7],
+      cfg: { gender: 'female', hair: 'bob', hairColor: '#5e4326', skin: '#c98a5f', eyes: '#5a3420',
+        outfit: 'coord', top: '#bcd4ee', skirt: '#d9ecf7', shoes: 'flats', shoeColor: '#a5713f',
+        accessories: { bow: true, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      lines: ['Miu emptied the entire spoon drawer again. Every. Single. Spoon.',
+        'Milo fusses over his herb garden more than the baby. It is close, though.',
+        'Would you like tea? We have mint. We have... more mint.',
+        'She is a small baby with a big personality. Wonder where she gets that.',
+        'The meadow breeze through the window is worth every step out here.'],
+      about: 'Miu walked eight steps in a row today! Then she sat down and applauded herself.' },
+    { id: 'miu', kind: 'baby', emoji: '👶', name: 'Baby Miu', spot: [2.3, 1.0],
+      cfg: { gender: 'female', hair: 'short', hairColor: '#5e4326', skin: '#c98a5f', eyes: '#5a3420',
+        outfit: 'party', top: '#d9ecf7', skirt: '#bcd4ee', shoes: 'flats', shoeColor: '#d9ecf7',
+        accessories: { bow: true, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      babble: ['MMMH!', 'Spoon! *waves a spoon*', '*determined crawl*', 'Papa! Papa!', '*proud baby giggle*'] },
+  ] },
+  { home: 'cocoabean', label: 'The Cocoabeans', members: [
+    { id: 'cade', kind: 'parent', emoji: '☕', name: 'Cade Cocoabean', spot: [-1.4, 0.9],
+      cfg: { gender: 'male', hair: 'curly', hairColor: '#3a2a20', skin: '#8f5f42', eyes: '#2f2420',
+        outfit: 'smart', top: '#a5713f', skirt: '#5e4326', shoes: 'boots', shoeColor: '#3a3a2a',
+        accessories: { bow: true, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      lines: ['I roast cocoa beans for the whole kingdom. My daughter taste-tests. Rigorously.',
+        'Coco has a chocolate-detecting nose. Nothing in this house is safe.',
+        'Cora says our house smells like dessert. I call that a professional achievement.',
+        'The little one already waves like the royals do. We are raising nobility, clearly.',
+        'Sit a while? The cocoa is fresh. The baby is... also fresh.'],
+      about: 'Coco can smell chocolate from the other room. She is nineteen months old. A prodigy.' },
+    { id: 'cora', kind: 'parent', emoji: '🍫', name: 'Cora Cocoabean', spot: [0.9, 1.7],
+      cfg: { gender: 'female', hair: 'long', hairColor: '#3a2a20', skin: '#8f5f42', eyes: '#3a2a1e',
+        outfit: 'coord', top: '#d9a066', skirt: '#f0e0d0', shoes: 'flats', shoeColor: '#a5713f',
+        accessories: { bow: true, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      lines: ['Our kitchen is 60% cocoa, 40% chaos. We like those odds.',
+        'Coco said "choclit" before she said "mama". Cade framed the moment.',
+        'A warm house, a warm drink, and a warm baby on your lap. That is the whole recipe.',
+        'Do not leave the door open — the smell of cocoa attracts gummy bears.',
+        'Cade claims he is "just tasting for quality". Sure, dear.'],
+      about: 'Coco shares her cocoa buttons with exactly one person: her teddy bear. She has standards.' },
+    { id: 'coco', kind: 'baby', emoji: '👶', name: 'Baby Coco', spot: [2.3, 1.0],
+      cfg: { gender: 'female', hair: 'buns', hairColor: '#3a2a20', skin: '#8f5f42', eyes: '#3a2a1e',
+        outfit: 'party', top: '#f0e0d0', skirt: '#d9a066', shoes: 'flats', shoeColor: '#f0e0d0',
+        accessories: { bow: true, crown: false, glasses: false, wings: false, halo: false, wand: false } },
+      babble: ['Choclit!', '*hugs her teddy*', 'Dada dada!', '*blows a tiny raspberry*', 'MmmMMM!'] },
+  ] },
+];
+export function buildFamilies() {
+  for (const f of families) {
+    for (const m of f.members) {
+      m.doll.group.parent && m.doll.group.parent.remove(m.doll.group);
+      m.doll.dispose();
+    }
+  }
+  families.length = 0;
+  for (const def of FAMILY_DEFS) {
+    const home = ctx.world.homes.find((h) => h.id === def.home);
+    if (!home) continue;
+    const f = { home, label: def.label, members: [] };
+    for (const md of def.members) {
+      const doll = createDoll({ ...md.cfg });
+      if (md.kind === 'baby') doll.group.scale.setScalar(BABY_SCALE);
+      const spot = new THREE.Vector3(md.spot[0] + (Math.random() - 0.5) * 0.3, 0, md.spot[1] + (Math.random() - 0.5) * 0.3);
+      doll.group.position.copy(spot);
+      doll.group.rotation.y = Math.random() * Math.PI * 2;
+      home.interior.group.add(doll.group);
+      f.members.push({
+        doll, ch: md, home, kind: md.kind,
+        spot, target: spot.clone(),
+        where: 'in', /* in | out */
+        wanderT: 0.5 + Math.random() * 2,
+        outingT: 200 + Math.random() * 280, /* parents: rare stroll */
+        lingerT: 0,
+        waveT: 2 + Math.random() * 4,
+        giggleT: 4 + Math.random() * 6,
+        walk01: 0,
+      });
+    }
+    families.push(f);
+  }
+}
+/* inside=true: members in the active home; inside=false: members outside */
+export function nearestFamilyMember(maxD, inside) {
+  let best = null, bestD = maxD * maxD;
+  for (const f of families) {
+    if (inside) {
+      const active = getActiveHome();
+      if (!active || active.id !== f.home.id) continue;
+    }
+    for (const m of f.members) {
+      if ((m.where === 'in') !== inside) continue;
+      const d2 = m.doll.group.position.distanceToSquared(ctx.player.group.position);
+      if (d2 < bestD) { bestD = d2; best = m; }
+    }
+  }
+  return best;
+}
+export function talkToFamilyMember(m) {
+  m.doll.wave();
+  const wrap = document.createElement('div');
+  wrap.className = 'dchoices';
+  if (m.kind === 'parent') {
+    dialogueHtml(m.ch.name, m.ch.emoji, m.ch.lines[(Math.random() * m.ch.lines.length) | 0], null);
+    wrap.appendChild(dchoiceBtn('🍼 About the little one', () => {
+      dialogueHtml(m.ch.name, m.ch.emoji, m.ch.about, null);
+    }));
+    wrap.appendChild(dchoiceBtn('💬 Chat', () => {
+      dialogueHtml(m.ch.name, m.ch.emoji, m.ch.lines[(Math.random() * m.ch.lines.length) | 0], null);
+    }));
+  } else {
+    dialogueHtml(m.ch.name, m.ch.emoji, m.ch.babble[(Math.random() * m.ch.babble.length) | 0], null);
+    wrap.appendChild(dchoiceBtn('🤗 Peek-a-boo', () => {
+      dialogueHtml(m.ch.name, m.ch.emoji, '*peek-a-boo!* ' + m.ch.babble[(Math.random() * m.ch.babble.length) | 0], null);
+      if (ctx.ui.effectsOn()) ctx.effects.spawnHearts(2, m.doll.group.position);
+      m.doll.wave();
+    }));
+    wrap.appendChild(dchoiceBtn('🎵 Sing a lullaby', () => {
+      dialogueHtml(m.ch.name, m.ch.emoji, '*sways to the lullaby* ' + m.ch.babble[(Math.random() * m.ch.babble.length) | 0], null);
+      if (ctx.ui.effectsOn()) ctx.effects.spawnHearts(1, m.doll.group.position);
+    }));
+  }
+  wrap.appendChild(dchoiceBtn('👋 Bye', closeDialogue));
+  $('dialogue').appendChild(wrap);
+}
+const _famTarget = new THREE.Vector3();
+export function updateFamily(f, dt, t) {
+  const inThisHome = ctx.game.mode === 'house' && getActiveHome() && getActiveHome().id === f.home.id;
+  for (const m of f.members) {
+    const p = m.doll.group.position;
+    if (m.where === 'in') {
+      /* wander near the spot (babies tighter) */
+      m.wanderT -= dt;
+      if (m.wanderT <= 0) {
+        m.wanderT = 1.5 + Math.random() * 3.5;
+        const rad = m.kind === 'baby' ? 0.8 : 2.2;
+        _famTarget.set(
+          THREE.MathUtils.clamp(m.spot.x + (Math.random() - 0.5) * rad * 2, -3.4, 3.4), 0,
+          THREE.MathUtils.clamp(m.spot.z + (Math.random() - 0.5) * rad * 2, -2.2, 2.4));
+        m.target.copy(_famTarget);
+      }
+      const dx = m.target.x - p.x, dz = m.target.z - p.z;
+      const d = Math.hypot(dx, dz);
+      const speed = m.kind === 'baby' ? 0.5 : 0.8;
+      if (d > 0.15) {
+        p.x += (dx / d) * speed * dt;
+        p.z += (dz / d) * speed * dt;
+        m.doll.group.rotation.y = lerpAngle(m.doll.group.rotation.y, Math.atan2(dx, dz), Math.min(1, dt * 5));
+        m.walk01 = m.kind === 'baby' ? 0.5 : 0.35;
+      } else m.walk01 = 0;
+      /* face the visitor while chatting distance */
+      if (inThisHome) {
+        const to = ctx.player.group.position;
+        const dp = Math.hypot(to.x - p.x, to.z - p.z);
+        if (dp < 2.6) {
+          m.doll.group.rotation.y = lerpAngle(m.doll.group.rotation.y, Math.atan2(to.x - p.x, to.z - p.z), Math.min(1, dt * 4));
+          m.waveT -= dt;
+          if (m.waveT <= 0) { m.doll.wave(); m.waveT = 5 + Math.random() * 5; }
+          if (m.kind === 'baby') {
+            m.giggleT -= dt;
+            if (m.giggleT <= 0) {
+              m.giggleT = 6 + Math.random() * 8;
+              if (ctx.ui.effectsOn()) ctx.effects.spawnHearts(1, p);
+            }
+          }
+        }
+      }
+      /* parents: rare outing */
+      if (m.kind === 'parent') {
+        m.outingT -= dt;
+        if (m.outingT <= 0 && !inThisHome) {
+          /* step outside for a short stroll */
+          m.where = 'out';
+          m.lingerT = 25 + Math.random() * 30;
+          m.outingT = 240 + Math.random() * 320;
+          ctx.world.group.add(m.doll.group);
+          m.doll.group.position.copy(f.home.exit);
+          m.doll.group.rotation.y = Math.atan2(f.home.pos.x - f.home.exit.x, f.home.pos.z - f.home.exit.z);
+        }
+      }
+    } else {
+      /* outside: linger near the door, then head back in */
+      m.lingerT -= dt;
+      m.wanderT -= dt;
+      if (m.wanderT <= 0) {
+        m.wanderT = 4 + Math.random() * 4;
+        _famTarget.set(
+          f.home.exit.x + (Math.random() - 0.5) * 4, 0,
+          f.home.exit.z + (Math.random() - 0.5) * 4);
+        m.target.copy(_famTarget);
+      }
+      const dx = m.target.x - p.x, dz = m.target.z - p.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.2) {
+        p.x += (dx / d) * 0.9 * dt;
+        p.z += (dz / d) * 0.9 * dt;
+        m.doll.group.rotation.y = lerpAngle(m.doll.group.rotation.y, Math.atan2(dx, dz), Math.min(1, dt * 5));
+        m.walk01 = 0.4;
+      } else m.walk01 = 0;
+      if (m.lingerT <= 0) {
+        /* walk back inside */
+        m.where = 'in';
+        f.home.interior.group.add(m.doll.group);
+        m.doll.group.position.copy(m.spot);
+        m.target.copy(m.spot);
+      }
+      /* keep within world bounds */
+      resolveWorldCollisions(p, 0.3);
+    }
+    m.doll.update({ walk01: m.walk01, dance01: 0, beatPhase: ctx.music.beatPhase() }, dt, t);
+  }
 }
 
 /* ------------------------------------------------------------------ */

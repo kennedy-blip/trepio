@@ -9,7 +9,8 @@ device and can be exported as a file.
 
 **3.0 "The Living Fantasy Kingdom"** began the art overhaul: golden-morning
 lighting, a natural meadow palette, and a rebuilt timber-and-shingle village —
-candy as *accents*, not candy-everything. **3.1** rebuilt the palace as a
+candy as *accents*, not candy-everything. **3.4** added four family homes
+(babies included, full interaction). **3.1** rebuilt the palace as a
 full **candy palace** (lollipop-topped towers, gumdrop domes, icing trims,
 candy-cane gate) with **palace guards** stationed at the gate. **3.2** made
 the world lush and crowded: a candy-hedge maze, plump swirl lollipops, dense
@@ -29,7 +30,7 @@ offline. **Live at <https://trepio.vercel.app>**.
 | 👑 **The royal family** | Six royals in the palace — King Jamoh, Queen Dama, Prince Ken, Princess Fay, Duke Whitney, Chef Bleso — each with a quest line and a warm word. |
 | 🍭 **The Candy Palace** | A lollipop-towered palace guarded by **Guard Gumdrop & Guard Taffy**, who flank the gate and greet every visitor. |
 | 📜 **12 quests** | From *Sweet Tooth* (collect candies) and *Royal Visit* to finding the Golden Gummy Bear and helping the royals — tracked in your quest journal. |
-| 🏡 **7 village homes** | Every villager has a cottage. Knock on the door, come inside, sit on the furniture — the owner may be home. |
+| 🏡 **7 village homes + 4 family homes** | Every villager has a cottage — knock, come inside, sit on the furniture. Plus four far-flung **family homes** where whole families live: two parents and their **babies** (the Gumdropps even have twins), with cribs, toy blocks and teddy bears. Everyone is talkable — peek-a-boo with the babies included. |
 | 🐾 **5 pets** | Gummy Cat, Coco Bunny, Sugar Pup — plus the premium Gummy Bear (🍬 60) and Candy Unicorn (🍬 100) — follow you around the kingdom. |
 | 🕹️ **2 arcade mini-games** | **Candy Catch** (catch falling candies) and **Gummy Rush** (ring race) — best scores are saved, and the first win of each game per visit pays **double candies**. |
 | 👗 **Wardrobe** | Hairstyles, outfits and accessories for every character, unlocked as you level up. Boys and girls get their own collections. |

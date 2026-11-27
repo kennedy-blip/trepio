@@ -20,8 +20,10 @@ import * as saveMod from './save.js';
 import { RACE_PAR, QUESTS, royalsMet, updateTracker, renderJournal, completeQuest, updateQuests, nameOf } from './quests.js';
 import { SHOP, candyBalance, renderShop, buyItem } from './inventory.js';
 import { startMini, cancelMini, updateMini } from './minigames.js';
-import { npcs, royals, guards, rebuildNpcs, buildRoyals, buildGuards, updateNpc, updateRoyal, updateGuard,
-         nearestNpc, nearestRoyal, nearestGuard, talkToNpc, talkToGuard, closeDialogue, dialogueOpen,
+import { npcs, royals, guards, families, rebuildNpcs, buildRoyals, buildGuards, buildFamilies,
+         updateNpc, updateRoyal, updateGuard, updateFamily,
+         nearestNpc, nearestRoyal, nearestGuard, nearestFamilyMember,
+         talkToNpc, talkToGuard, talkToFamilyMember, closeDialogue, dialogueOpen,
          enterNpcHome, exitNpcHome } from './npc.js';
 import { enterHome, leaveHome, nearestHomeDoor, hideAllInteriors, playerSit, getActiveHome } from './homes.js';
 import { initQuality } from './quality.js';
@@ -940,6 +942,12 @@ function interact() {
       startMini(arc.id);
       return;
     }
+    /* a parent out on their rare stroll? (close range beats the door) */
+    const famOut = nearestFamilyMember(2.3, false);
+    if (famOut) {
+      talkToFamilyMember(famOut);
+      return;
+    }
     /* an NPC's front door? */
     const home = nearestHomeDoor();
     if (home) {
@@ -964,6 +972,12 @@ function interact() {
     }
     toast('Nobody is close enough to talk to 🤔 — walk up to a doll!', 2200);
   } else if (game.mode === 'house') {
+    /* a family home? parents and babies alike */
+    const fam = nearestFamilyMember(2.7, true);
+    if (fam) {
+      talkToFamilyMember(fam);
+      return;
+    }
     /* the owner might be home */
     const owner = npcs.find((x) => x.home === getActiveHome());
     if (owner && owner.homeState === 'home' &&
@@ -983,7 +997,11 @@ function interact() {
         return;
       }
     }
-    toast(`${nameOf(getActiveHome().npc)} is out exploring — come back later! 🚶`, 2400);
+    if (getActiveHome().family) {
+      toast(`${getActiveHome().family} are home — walk up and say hi! 👋`, 2400);
+    } else {
+      toast(`${nameOf(getActiveHome().npc)} is out exploring — come back later! 🚶`, 2400);
+    }
   } else if (game.mode === 'castle') {
     /* near door -> leave */
     if (player.group.position.z > 7.8 && Math.abs(player.group.position.x) < 1.3) {
@@ -1377,7 +1395,8 @@ function animate() {
     updatePlayer(dt, t);
     player.update({ walk01: game.walk01, dance01: game.danceT > 0 ? 1 : 0, beatPhase: beat }, dt, t);
     for (const n of npcs) updateNpc(n, dt, t);
-    for (const g of guards) updateGuard(g, dt, t); /* the owner runs if they are home */
+    for (const g of guards) updateGuard(g, dt, t);
+    for (const f of families) updateFamily(f, dt, t); /* the owner runs if they are home */
     world.update(dt, t);
     cam.target.set(player.group.position.x, player.group.position.y + 1.1, player.group.position.z);
     updateCamera(dt, false);
@@ -1387,6 +1406,7 @@ function animate() {
     player.update({ walk01: game.walk01, dance01: game.danceT > 0 ? 1 : 0, beatPhase: beat }, dt, t);
     for (const n of npcs) updateNpc(n, dt, t);
     for (const g of guards) updateGuard(g, dt, t);
+    for (const f of families) updateFamily(f, dt, t);
     updateMini(dt, t);
     if (game.mini) updateTracker();
     world.update(dt, t);
@@ -1425,6 +1445,7 @@ $('btnMute').textContent = state.settings.music ? '🔊' : '🔇';
 rebuildNpcs();
 buildRoyals();
 buildGuards();
+buildFamilies();
 if (state.mode === 'world') enterWorld(); else enterStudio();
 if (state.settings.pet && state.purchases['pet_' + state.settings.pet]) setPet(state.settings.pet);
 updateStats();
@@ -1440,6 +1461,7 @@ if (DEBUG) {
     interact, enterCastle, leaveCastle, openChest, raw: state,
     simulateFps: (x) => quality.simulateFps(x),
     qualityTick: (s) => quality.debugAdvance(s),
+    families,
     enterHome(id) { const h = world.homes.find((x) => x.id === id); if (h) enterHome(h); },
     leaveHome, startMini, cancelMini, setPet,
     saveApi: saveMod,
@@ -1476,6 +1498,14 @@ if (DEBUG) {
         qualityTier: quality.level(),
         guards: guards.length,
         guardPos: guards.map((g) => g.doll.group.position.toArray()),
+        familyHomes: families.length,
+        families: families.map((f) => ({
+          home: f.home.id,
+          members: f.members.map((m) => ({
+            id: m.ch.id, name: m.ch.name, kind: m.kind, where: m.where,
+            pos: m.doll.group.position.toArray(),
+          })),
+        })),
         camPitch: cam.pitch,
         camDist: cam.dist,
         camPos: camera.position.toArray(),
