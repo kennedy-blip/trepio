@@ -215,15 +215,15 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouch ? 1.5 : 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMappingExposure = 1.12;
 renderer.shadowMap.enabled = !!state.settings.shadows;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 260);
 
-scene.add(new THREE.HemisphereLight(0xfff4ec, 0xffd9e6, 1.0));
-const key = new THREE.DirectionalLight(0xffffff, 2.3);
+scene.add(new THREE.HemisphereLight(0xcfe3ee, 0xb7c79a, 1.05));
+const key = new THREE.DirectionalLight(0xfff1dc, 2.4);
 key.castShadow = !!state.settings.shadows;
 key.shadow.mapSize.set(isTouch ? 1024 : 2048, isTouch ? 1024 : 2048);
 key.shadow.camera.left = -18; key.shadow.camera.right = 18;
@@ -232,8 +232,8 @@ key.shadow.camera.near = 0.5; key.shadow.camera.far = 60;
 key.shadow.bias = -0.0008;
 key.shadow.normalBias = 0.02;
 scene.add(key, key.target);
-const rim = new THREE.DirectionalLight(0xffc4e0, 1.1);
-rim.position.set(-3, 2.2, -2.4);
+const rim = new THREE.DirectionalLight(0xbcd4e8, 0.9);
+rim.position.set(-6, 3, -4);
 scene.add(rim);
 
 function bgTexture(top, bot) {
@@ -251,9 +251,9 @@ function bgTexture(top, bot) {
   return tex;
 }
 const studioBg = bgTexture('#ffeaf3', '#ffd2a6');
-const worldBg = bgTexture('#bfe6ff', '#ffd9e6');
+const worldBg = bgTexture('#a9d3e6', '#fde8cf');
 const studioFog = new THREE.Fog(0xffd2a6, 9, 16);
-const worldFog = new THREE.Fog(0xffd9e6, 45, 130);
+const worldFog = new THREE.Fog(0xf2e2cc, 45, 130);
 const castleFog = new THREE.Fog(0xf6c7d9, 14, 30);
 
 /* ------------------------------------------------------------------ */
@@ -1346,7 +1346,7 @@ function animate() {
 
   updatePet(dt, t);
 
-  key.position.set(_lightTarget.x + 6, _lightTarget.y + 11, _lightTarget.z + 5);
+  key.position.set(_lightTarget.x + 7, _lightTarget.y + 8.5, _lightTarget.z + 6);
   key.target.position.copy(_lightTarget);
   key.target.updateMatrixWorld();
 
