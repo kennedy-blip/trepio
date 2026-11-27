@@ -11,7 +11,10 @@ device and can be exported as a file.
 lighting, a natural meadow palette, and a rebuilt timber-and-shingle village —
 candy as *accents*, not candy-everything. **3.1** rebuilt the palace as a
 full **candy palace** (lollipop-topped towers, gumdrop domes, icing trims,
-candy-cane gate) with **palace guards** stationed at the gate.
+candy-cane gate) with **palace guards** stationed at the gate. **3.2** made
+the world lush and crowded: a candy-hedge maze, plump swirl lollipops, dense
+flower meadows and pastel candy bushes — with every walkpath kept clear — plus
+a free-tilt, wall-aware camera.
 
 Built with [three.js](https://threejs.org) — a single static page, playable
 offline. **Live at <https://trepio.vercel.app>**.
@@ -32,8 +35,10 @@ offline. **Live at <https://trepio.vercel.app>**.
 
 ## 🎮 Controls
 
-**Desktop** — WASD / arrows to move, mouse to look, `Space` to jump,
-`E` to interact (talk, doors, arcades, chairs), `Esc` to close panels.
+**Desktop** — WASD / arrows to move, mouse to look (drag up/down to tilt the
+camera from the horizon to a top-down view), scroll to zoom, `Space` to jump,
+`E` to interact (talk, doors, arcades, chairs), `Esc` to close panels. The
+camera automatically pulls in when a wall would block your view.
 **Mobile** — touch joystick + look-drag; on-screen buttons for jump, talk
 and journal.
 

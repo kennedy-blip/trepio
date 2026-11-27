@@ -424,13 +424,42 @@ const cam = {
 ctx.cam = cam;
 input.onDrag((dx, dy) => {
   cam.yaw -= dx * 0.005;
-  cam.pitch = THREE.MathUtils.clamp(cam.pitch + dy * 0.004, 0.12, 1.15);
+  cam.pitch = THREE.MathUtils.clamp(cam.pitch + dy * 0.004, -0.12, 1.3);
   cam.lastUser = performance.now() / 1000;
 });
 input.onZoom((dz) => {
   cam.dist = THREE.MathUtils.clamp(cam.dist + dz, 2.6, (game.mode === 'castle' || game.mode === 'house') ? 5.5 : 14);
 });
 const _camDesired = new THREE.Vector3();
+/* is this camera position clear of walls? (colliders for the active mode) */
+function camPointClear(x, y, z) {
+  const m = 0.35;
+  let boxes, circles;
+  if (game.mode === 'castle') { boxes = world.castle.boxes; circles = world.castle.circles; }
+  else if (game.mode === 'house') {
+    const h = getActiveHome();
+    boxes = h ? h.interior.boxes : [];
+    circles = h ? h.interior.circles : [];
+  } else { boxes = world.boxes; circles = world.circles; }
+  if (game.mode === 'world' && y > 3.6) {
+    /* above the cottage & maze eaves — only tall structures (the palace gate) matter */
+    for (const b of boxes) {
+      if ((b.h || 0) < 4) continue;
+      if (x > b.minX - m && x < b.maxX + m && z > b.minZ - m && z < b.maxZ + m) return false;
+    }
+    return true;
+  }
+  for (const b of boxes) {
+    if (b.h !== undefined && y > b.h) continue; /* above this wall */
+    if (x > b.minX - m && x < b.maxX + m && z > b.minZ - m && z < b.maxZ + m) return false;
+  }
+  for (const c of circles) {
+    if (c.r < 1.0) continue; /* small props never yank the camera */
+    const dx = x - c.x, dz = z - c.z, rr = c.r + m;
+    if (dx * dx + dz * dz < rr * rr) return false;
+  }
+  return true;
+}
 function updateCamera(dt, auto) {
   if (auto && !reducedMotion && performance.now() / 1000 - cam.lastUser > 4) cam.yaw += dt * 0.12;
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
@@ -439,6 +468,19 @@ function updateCamera(dt, auto) {
     cam.target.y + sp * cam.dist,
     cam.target.z + Math.cos(cam.yaw) * cp * cam.dist
   );
+  /* wall-aware: pull in toward the target until the view is clear (min 28% dist) */
+  {
+    const dx = _camDesired.x - cam.target.x;
+    const dy = _camDesired.y - cam.target.y;
+    const dz = _camDesired.z - cam.target.z;
+    let t = 1;
+    while (t > 0.28 && !camPointClear(cam.target.x + dx * t, cam.target.y + dy * t, cam.target.z + dz * t)) {
+      t -= 0.05;
+    }
+    const tt = Math.max(t, 0.28);
+    if (tt < 1) _camDesired.set(cam.target.x + dx * tt, cam.target.y + dy * tt, cam.target.z + dz * tt);
+  }
+  if (_camDesired.y < 0.7) _camDesired.y = 0.7; /* never dip underground */
   const k = 1 - Math.exp(-8 * dt);
   camera.position.lerp(_camDesired, k);
   camera.lookAt(cam.target);
@@ -1434,6 +1476,9 @@ if (DEBUG) {
         qualityTier: quality.level(),
         guards: guards.length,
         guardPos: guards.map((g) => g.doll.group.position.toArray()),
+        camPitch: cam.pitch,
+        camDist: cam.dist,
+        camPos: camera.position.toArray(),
         gender: player.male ? 'male' : 'female',
         level: progress.level,
         xp: progress.xp,
