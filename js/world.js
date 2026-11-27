@@ -80,6 +80,27 @@ function sprinkleTex(base = '#a9c88f') {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }, 26, 26);
 }
+/* lollipop swirl for palace toppers & discs */
+function swirlTex() {
+  return canvasTex(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = '#fff4f8';
+    ctx.fillRect(0, 0, w, h);
+    ctx.translate(w / 2, h / 2);
+    for (let arm = 0; arm < 3; arm++) {
+      ctx.beginPath();
+      ctx.strokeStyle = arm === 1 ? '#f45d8e' : '#ff8fb7';
+      ctx.lineWidth = 13;
+      for (let a = 0; a < Math.PI * 4; a += 0.05) {
+        const r = 4 + a * 4.6;
+        const x = Math.cos(a + (arm * Math.PI * 2) / 3) * r;
+        const y = Math.sin(a + (arm * Math.PI * 2) / 3) * r;
+        if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  });
+}
+
 /* warm shingle rows for cottage roofs */
 function shingleTex() {
   return canvasTex(128, 128, (ctx, w, h) => {
@@ -551,54 +572,151 @@ export function createWorld(scene, keyLight) {
     }
   }
 
-  /* ---------------- candy castle (north, past the maze exit) ---------------- */
+  /* ---------------- candy palace (north — lollipop towers, per the reference) ---------------- */
   {
     const castle = new THREE.Group();
-    const wallMat = mat('#fdf0f5', { roughness: 0.6 });
-    const roofPink = mat('#f45d8e', { roughness: 0.4 });
-    const roofBlue = mat('#63b8f5', { roughness: 0.4 });
-    const roofGold = mat('#ffd45e', { roughness: 0.35 });
-    function tower(x, z, r, h, roofMat_, roofH) {
+    const swirlMat = new THREE.MeshStandardMaterial({ map: swirlTex(), roughness: 0.35 });
+    const wallMat = mat('#fdf3f0', { roughness: 0.55 });
+    const icingMat = mat('#fff6f2', { roughness: 0.45 });
+    const GUMDROPS = ['#f45d8e', '#63b8f5', '#ffd45e', '#a7d97a', '#b57de0', '#ff9e4f'];
+
+    /* a swirl lollipop on a stick (tower topper) */
+    function lolliTop(y, r, stickH) {
+      const g = new THREE.Group();
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.09, r * 0.09, stickH, 8), mat('#fff6ec', { roughness: 0.4 }));
+      stick.position.y = stickH / 2;
+      g.add(stick);
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(r, r, r * 0.28, 24), swirlMat);
+      disc.rotation.x = Math.PI / 2;
+      disc.position.y = stickH + r * 0.5;
+      disc.castShadow = true;
+      g.add(disc);
+      g.position.y = y;
+      return g;
+    }
+
+    /* gumdrop-dome tower with icing scallops + lollipop topper */
+    function tower(x, z, r, h, domeColor, lolliR) {
       const t = new THREE.Group();
       const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.08, h, 18), wallMat);
       body.position.y = h / 2;
       body.castShadow = true;
       t.add(body);
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(r * 1.35, roofH, 18), roofMat_);
-      roof.position.y = h + roofH / 2;
-      roof.castShadow = true;
-      t.add(roof);
-      const flag = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 8), roofGold);
-      flag.position.y = h + roofH + 0.22;
-      t.add(flag);
-      /* stripe bands */
-      for (let y = 1; y < h; y += 1.8) {
-        const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.01, r * 1.01, 0.16, 18), stripesMat);
+      /* candy stripe bands */
+      for (let y = 1.2; y < h - 0.6; y += 2.1) {
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.01, r * 1.01, 0.18, 18), stripesMat);
         band.position.y = y;
         t.add(band);
+      }
+      /* icing scallop ring under the dome */
+      const n = Math.max(8, (r * 8) | 0);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const b = new THREE.Mesh(new THREE.SphereGeometry(r * 0.22, 10, 8), icingMat);
+        b.position.set(Math.cos(a) * r, h - 0.06, Math.sin(a) * r);
+        t.add(b);
+      }
+      /* gumdrop dome */
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(r * 1.12, 22, 16, 0, Math.PI * 2, 0, Math.PI * 0.55),
+        mat(domeColor, { roughness: 0.35 }));
+      dome.position.y = h - 0.1;
+      dome.castShadow = true;
+      t.add(dome);
+      /* lollipop topper */
+      t.add(lolliTop(h + r * 0.5, lolliR, lolliR * 1.4));
+      /* glowing candy windows */
+      for (let wy = 2.2; wy < h - 1.2; wy += 2.4) {
+        const win = new THREE.Mesh(new THREE.CircleGeometry(r * 0.26, 14),
+          new THREE.MeshStandardMaterial({ color: '#fff3b8', emissive: '#ffd45e', emissiveIntensity: 0.45 }));
+        win.position.set(0, wy, r * 1.09);
+        t.add(win);
+        const frame = new THREE.Mesh(new THREE.TorusGeometry(r * 0.28, r * 0.05, 8, 18), icingMat);
+        frame.position.set(0, wy, r * 1.09);
+        t.add(frame);
       }
       t.position.set(x, 0, z);
       castle.add(t);
       circles.push({ x, z, r: r * 1.15 });
       return t;
     }
-    tower(0, -44, 2.3, 10, roofPink, 3.4);
-    tower(-5.4, -44.5, 1.7, 7, roofBlue, 2.6);
-    tower(5.4, -44.5, 1.7, 7, roofBlue, 2.6);
-    tower(-3.4, -48.5, 1.1, 5, roofGold, 1.8);
-    tower(3.4, -48.5, 1.1, 5, roofGold, 1.8);
-    /* gate wall between towers */
+    tower(0, -44, 2.3, 11, '#f45d8e', 1.05);
+    tower(-5.4, -44.5, 1.7, 8, '#63b8f5', 0.8);
+    tower(5.4, -44.5, 1.7, 8, '#63b8f5', 0.8);
+    tower(-3.4, -48.5, 1.2, 6, '#ffd45e', 0.6);
+    tower(3.4, -48.5, 1.2, 6, '#ffd45e', 0.6);
+
+    /* gate wall: cream with icing trim + gumdrop crenellations */
     const gate = new THREE.Mesh(new THREE.BoxGeometry(8.6, 4.6, 1.4), wallMat);
     gate.position.set(0, 2.3, -44);
     gate.castShadow = true;
     castle.add(gate);
-    const door = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 1.5, 20, 1, false, 0, Math.PI), mat('#8a5a3a'));
+    /* icing drip trim along the top */
+    for (let i = 0; i < 11; i++) {
+      const gx = -4.1 + i * 0.82;
+      const drop = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), icingMat);
+      drop.position.set(gx, 4.68, -43.3);
+      drop.scale.y = 1.4;
+      castle.add(drop);
+    }
+    /* gumdrop crenellations */
+    GUMDROPS.forEach((c, i) => {
+      const gd = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), mat(c, { roughness: 0.35 }));
+      gd.position.set(-3.75 + i * 1.5, 4.95, -44);
+      gd.scale.y = 1.15;
+      castle.add(gd);
+    });
+    /* glowing round windows on the gate wall */
+    for (const s of [-1, 1]) {
+      const win = new THREE.Mesh(new THREE.CircleGeometry(0.34, 16),
+        new THREE.MeshStandardMaterial({ color: '#fff3b8', emissive: '#ffd45e', emissiveIntensity: 0.45 }));
+      win.position.set(s * 2.9, 3.4, -43.28);
+      castle.add(win);
+      const frame = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.05, 8, 18), icingMat);
+      frame.position.set(s * 2.9, 3.4, -43.28);
+      castle.add(frame);
+    }
+    /* candy-cane columns flanking the gate */
+    for (const s of [-1, 1]) {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 4.2, 14), stripesMat);
+      col.position.set(s * 1.85, 2.1, -43.15);
+      col.castShadow = true;
+      castle.add(col);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), mat('#f45d8e', { roughness: 0.35 }));
+      cap.position.set(s * 1.85, 4.35, -43.15);
+      castle.add(cap);
+    }
+    /* the big palace door: chocolate with a pink icing arch + gold knob */
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(1.22, 0.17, 10, 24, Math.PI), mat('#ff8fb7', { roughness: 0.45 }));
+    arch.position.set(0, 1.0, -43.05);
+    castle.add(arch);
+    const door = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 1.5, 20, 1, false, 0, Math.PI), mat('#7a4a2b', { roughness: 0.5 }));
     door.rotation.set(Math.PI / 2, 0, Math.PI / 2);
     door.position.set(0, 1.0, -43.2);
+    door.castShadow = true;
     castle.add(door);
-    const crenellation = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.35, 1.7), roofPink);
-    crenellation.position.set(0, 4.75, -44);
-    castle.add(crenellation);
+    /* big lollipops flanking the approach + gumdrop lamps */
+    for (const s of [-1, 1]) {
+      const lp = lolliTop(0, 0.85, 3.0);
+      lp.position.set(s * 3.6, 0, -38.6);
+      castle.add(lp);
+      circles.push({ x: s * 3.6, z: -38.6, r: 0.5 });
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.5, 10), mat('#c9a06a', { roughness: 0.7 }));
+      post.position.set(s * 2.3, 0.75, -38.6);
+      castle.add(post);
+      const lampG = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), mat('#ffd45e', { emissive: '#ffd45e', emissiveIntensity: 0.6, roughness: 0.4 }));
+      lampG.position.set(s * 2.3, 1.7, -38.6);
+      castle.add(lampG);
+    }
+    /* scattered candy along the approach */
+    GUMDROPS.forEach((c, i) => {
+      const s = i % 2 ? 1 : -1;
+      const gd = new THREE.Mesh(new THREE.SphereGeometry(0.18 + (i % 3) * 0.05, 10, 8), mat(c, { roughness: 0.35 }));
+      gd.position.set(s * (1.4 + (i % 3) * 0.8), 0.14, -39.8 - (i % 4) * 0.7);
+      gd.scale.y = 0.85;
+      castle.add(gd);
+    });
+
     group.add(castle);
     boxes.push({ minX: -4.3, maxX: 4.3, minZ: -44.7, maxZ: -43.3 });
   }

@@ -7,9 +7,11 @@ river, gumdrop village and a grand palace. Complete quests, meet the royal
 family, keep pets, and play arcade mini-games. Progress saves locally on your
 device and can be exported as a file.
 
-**3.0 "The Living Fantasy Kingdom"** begins the art overhaul: golden-morning
+**3.0 "The Living Fantasy Kingdom"** began the art overhaul: golden-morning
 lighting, a natural meadow palette, and a rebuilt timber-and-shingle village —
-candy as *accents*, not candy-everything.
+candy as *accents*, not candy-everything. **3.1** rebuilt the palace as a
+full **candy palace** (lollipop-topped towers, gumdrop domes, icing trims,
+candy-cane gate) with **palace guards** stationed at the gate.
 
 Built with [three.js](https://threejs.org) — a single static page, playable
 offline. **Live at <https://trepio.vercel.app>**.
@@ -20,6 +22,7 @@ offline. **Live at <https://trepio.vercel.app>**.
 |---|---|
 | 🧸 **8 characters** | Trixie, Momo, Zuri, Lulu, Kiki, Theo, Amani, Dex — each with their own speed, jump and personality. Seven of them live in the world as villagers you can chat with. |
 | 👑 **The royal family** | Six royals in the palace — King Jamoh, Queen Dama, Prince Ken, Princess Fay, Duke Whitney, Chef Bleso — each with a quest line and a warm word. |
+| 🍭 **The Candy Palace** | A lollipop-towered palace guarded by **Guard Gumdrop & Guard Taffy**, who flank the gate and greet every visitor. |
 | 📜 **12 quests** | From *Sweet Tooth* (collect candies) and *Royal Visit* to finding the Golden Gummy Bear and helping the royals — tracked in your quest journal. |
 | 🏡 **7 village homes** | Every villager has a cottage. Knock on the door, come inside, sit on the furniture — the owner may be home. |
 | 🐾 **5 pets** | Gummy Cat, Coco Bunny, Sugar Pup — plus the premium Gummy Bear (🍬 60) and Candy Unicorn (🍬 100) — follow you around the kingdom. |
@@ -106,8 +109,8 @@ Any static host works. This repo deploys on push to `main` via Vercel
 
 ## 🗺 Roadmap
 
-- **3.0 — art overhaul** (*Act I shipped*): golden-morning lighting with warm
-  fog, meadow-green palette, plaster-and-timber cottages with shingle roofs,
-  glowing windows, flower boxes and door lanterns, plus village footpaths.
-  *Act II (planned)*: the palace grounds and landmark props.
+- **3.0 — art overhaul** (*Acts I–II shipped*): golden-morning lighting with
+  warm fog, meadow-green palette, plaster-and-timber cottages with shingle
+  roofs, glowing windows, flower boxes, door lanterns, village footpaths —
+  and the full **candy palace** rebuild with gate guards (3.1).
 - Later — islands, achievements, fashion shows, seasonal events.
