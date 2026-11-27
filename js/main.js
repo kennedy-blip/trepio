@@ -20,8 +20,9 @@ import * as saveMod from './save.js';
 import { RACE_PAR, QUESTS, royalsMet, updateTracker, renderJournal, completeQuest, updateQuests, nameOf } from './quests.js';
 import { SHOP, candyBalance, renderShop, buyItem } from './inventory.js';
 import { startMini, cancelMini, updateMini } from './minigames.js';
-import { npcs, royals, rebuildNpcs, buildRoyals, updateNpc, updateRoyal, nearestNpc, nearestRoyal,
-         talkToNpc, closeDialogue, dialogueOpen, enterNpcHome, exitNpcHome } from './npc.js';
+import { npcs, royals, guards, rebuildNpcs, buildRoyals, buildGuards, updateNpc, updateRoyal, updateGuard,
+         nearestNpc, nearestRoyal, nearestGuard, talkToNpc, talkToGuard, closeDialogue, dialogueOpen,
+         enterNpcHome, exitNpcHome } from './npc.js';
 import { enterHome, leaveHome, nearestHomeDoor, hideAllInteriors, playerSit, getActiveHome } from './homes.js';
 import { initQuality } from './quality.js';
 import { lerpAngle, resolveWorldCollisions, resolveCastleCollisions, resolveBoxCircle } from './collide.js';
@@ -903,6 +904,12 @@ function interact() {
       enterHome(home);
       return;
     }
+    /* a palace guard? (they flank the gate — greet them, then walk between) */
+    const guard = nearestGuard(4);
+    if (guard) {
+      talkToGuard(guard);
+      return;
+    }
     /* palace gate? */
     if (player.group.position.distanceTo(world.castleDoor) < 3.4) {
       enterCastle();
@@ -1327,7 +1334,8 @@ function animate() {
   } else if (game.mode === 'house') {
     updatePlayer(dt, t);
     player.update({ walk01: game.walk01, dance01: game.danceT > 0 ? 1 : 0, beatPhase: beat }, dt, t);
-    for (const n of npcs) updateNpc(n, dt, t); /* the owner runs if they are home */
+    for (const n of npcs) updateNpc(n, dt, t);
+    for (const g of guards) updateGuard(g, dt, t); /* the owner runs if they are home */
     world.update(dt, t);
     cam.target.set(player.group.position.x, player.group.position.y + 1.1, player.group.position.z);
     updateCamera(dt, false);
@@ -1336,6 +1344,7 @@ function animate() {
     updatePlayer(dt, t);
     player.update({ walk01: game.walk01, dance01: game.danceT > 0 ? 1 : 0, beatPhase: beat }, dt, t);
     for (const n of npcs) updateNpc(n, dt, t);
+    for (const g of guards) updateGuard(g, dt, t);
     updateMini(dt, t);
     if (game.mini) updateTracker();
     world.update(dt, t);
@@ -1373,6 +1382,7 @@ $('btnMute').textContent = state.settings.music ? '🔊' : '🔇';
 /* boot */
 rebuildNpcs();
 buildRoyals();
+buildGuards();
 if (state.mode === 'world') enterWorld(); else enterStudio();
 if (state.settings.pet && state.purchases['pet_' + state.settings.pet]) setPet(state.settings.pet);
 updateStats();
@@ -1422,6 +1432,8 @@ if (DEBUG) {
         games: state.progress.games,
         quality: state.settings.quality || 'auto',
         qualityTier: quality.level(),
+        guards: guards.length,
+        guardPos: guards.map((g) => g.doll.group.position.toArray()),
         gender: player.male ? 'male' : 'female',
         level: progress.level,
         xp: progress.xp,

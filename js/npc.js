@@ -292,6 +292,117 @@ export function nearestNpc() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Palace guards (flank the gate, stand at attention, chat only)       */
+/* ------------------------------------------------------------------ */
+export const guards = [];
+const GUARD_SPOT = { z: -42.3, x: 2.6 }; /* just outside the gate interact ring */
+const GUARD_CFG = {
+  gender: 'male',
+  hair: 'mshort', hairColor: '#3b2a20', skin: '#b5714f', eyes: '#3a2a1e',
+  outfit: 'smart', top: '#d9485e', skirt: '#f2e7d4',
+  shoes: 'boots', shoeColor: '#4a3a2a',
+  accessories: { bow: true, crown: false, glasses: false, wings: false, halo: false, wand: false },
+};
+const GUARD_DEFS = [
+  { id: 'guardgum', emoji: '🍬', name: 'Guard Gumdrop', side: -1,
+    lines: [
+      'Halt! ...Just kidding — the palace is open to everyone.',
+      'Mind the chocolate river on your way in, traveller.',
+      'The King loves visitors. Head on through!',
+      'I have stood here so long, I have grown roots. Sweet, sugary roots.',
+      'Between us? The Chef Bleso bakes the guards extra cookies.',
+    ] },
+  { id: 'guardtaffy', emoji: '🍭', name: 'Guard Taffy', side: 1,
+    lines: [
+      'Welcome to the Candy Palace! Wipe your feet, please.',
+      'The royal family is receiving guests inside.',
+      'I once caught a gummy bear sneaking in. We shared it.',
+      'Pretty sweet post, right? Heh. Pretty sweet.',
+      'If you see a sparkle trail in the throne room — that was not me.',
+    ] },
+];
+export function buildGuards() {
+  for (const g of guards) {
+    g.doll.group.parent && g.doll.group.parent.remove(g.doll.group);
+    g.spear.parent && g.spear.parent.remove(g.spear);
+    g.doll.dispose();
+  }
+  guards.length = 0;
+  /* drop previous guard colliders, then add fresh ones */
+  for (let i = ctx.world.circles.length - 1; i >= 0; i--) {
+    if (ctx.world.circles[i].__guard) ctx.world.circles.splice(i, 1);
+  }
+  for (const def of GUARD_DEFS) {
+    const x = def.side * GUARD_SPOT.x;
+    const doll = createDoll({ ...GUARD_CFG });
+    doll.group.position.set(x, 0, GUARD_SPOT.z);
+    doll.group.rotation.y = 0; /* face the approach (south) */
+    doll.setPose('stand');
+    ctx.world.group.add(doll.group);
+    /* candy-cane spear planted beside each guard */
+    const spear = new THREE.Group();
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 2.3, 10),
+      new THREE.MeshStandardMaterial({ color: '#fff6ec', roughness: 0.4 }));
+    shaft.castShadow = true;
+    spear.add(shaft);
+    /* stripe the shaft with pink bands */
+    for (let y = -1.05; y <= 1.05; y += 0.3) {
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.15, 10),
+        new THREE.MeshStandardMaterial({ color: '#f45d8e', roughness: 0.4 }));
+      band.position.y = y;
+      spear.add(band);
+    }
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.28, 10),
+      new THREE.MeshStandardMaterial({ color: '#ffd45e', metalness: 0.5, roughness: 0.3 }));
+    tip.position.y = 1.28;
+    spear.add(tip);
+    spear.position.set(x + def.side * 0.55, 1.15, GUARD_SPOT.z + 0.15);
+    ctx.world.group.add(spear);
+    ctx.world.circles.push({ x, z: GUARD_SPOT.z, r: 0.42, __guard: true });
+    guards.push({ doll, ch: def, side: def.side, spear, waveTimer: 3 + Math.random() * 4 });
+  }
+}
+export function nearestGuard(maxD = 4) {
+  let best = null, bestD = maxD;
+  for (const g of guards) {
+    const d2 = g.doll.group.position.distanceToSquared(ctx.player.group.position);
+    if (d2 < bestD) { bestD = d2; best = g; }
+  }
+  return best;
+}
+export function talkToGuard(g) {
+  g.doll.wave();
+  const line = g.ch.lines[(Math.random() * g.ch.lines.length) | 0];
+  const choices = document.createElement('div');
+  choices.className = 'dchoices';
+  choices.appendChild(dchoiceBtn('💬 Chat', () => {
+    const l = g.ch.lines[(Math.random() * g.ch.lines.length) | 0];
+    dialogueHtml(g.ch.name, g.ch.emoji, l, null);
+  }));
+  choices.appendChild(dchoiceBtn('👋 Bye', closeDialogue));
+  dialogueHtml(g.ch.name, g.ch.emoji, line, null);
+  $('dialogue').appendChild(choices);
+}
+export function updateGuard(g, dt, t) {
+  const p = g.doll.group.position;
+  const to = ctx.player.group.position;
+  const d = Math.hypot(to.x - p.x, to.z - p.z);
+  if (d < 4.5 && ctx.game.mode === 'world') {
+    /* stand at attention and face the visitor */
+    g.doll.group.rotation.y = lerpAngle(g.doll.group.rotation.y, Math.atan2(to.x - p.x, to.z - p.z), Math.min(1, dt * 5));
+    g.waveTimer -= dt;
+    if (g.waveTimer <= 0) {
+      g.doll.wave();
+      g.waveTimer = 5 + Math.random() * 5;
+    }
+  } else {
+    g.doll.group.rotation.y = lerpAngle(g.doll.group.rotation.y, 0, Math.min(1, dt * 2));
+  }
+  g.doll.update({ walk01: 0, dance01: 0, beatPhase: ctx.music.beatPhase() }, dt, t);
+}
+
+/* ------------------------------------------------------------------ */
 /* The royal family (live inside the palace, never leave)              */
 /* ------------------------------------------------------------------ */
 export const royals = [];
