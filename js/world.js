@@ -183,6 +183,7 @@ export function createWorld(scene, keyLight) {
 
   const stripes = stripeTex();
   const stripesMat = new THREE.MeshStandardMaterial({ map: stripes, roughness: 0.5 });
+  const swirlMat = new THREE.MeshStandardMaterial({ map: swirlTex(), roughness: 0.35 });
 
   /* ---------------- ground ---------------- */
   const ground = new THREE.Mesh(
@@ -237,20 +238,36 @@ export function createWorld(scene, keyLight) {
   const walls = new THREE.InstancedMesh(wallGeo, stripesMat, wallCells.length);
   walls.castShadow = true;
   walls.receiveShadow = true;
+  /* gumdrop caps turn the striped boxes into a candy hedge */
+  const capGeo = new THREE.SphereGeometry(0.98, 12, 10);
+  const caps = new THREE.InstancedMesh(capGeo, new THREE.MeshStandardMaterial({ roughness: 0.4 }), wallCells.length);
+  caps.castShadow = true;
+  const CAP_COLS = ['#ff8fb7', '#ffd45e', '#63b8f5', '#a7d97a', '#b57de0'];
   {
     const d = new THREE.Object3D();
+    const col = new THREE.Color();
     wallCells.forEach(([x, y], i) => {
       d.position.set((x - HALF) * CELL, MAZE_H / 2, (y - HALF) * CELL);
+      d.rotation.set(0, 0, 0);
+      d.scale.set(1, 1, 1);
       d.updateMatrix();
       walls.setMatrixAt(i, d.matrix);
+      d.position.y = MAZE_H - 0.08;
+      d.scale.set(0.95, 0.55, 0.95);
+      d.updateMatrix();
+      caps.setMatrixAt(i, d.matrix);
+      caps.setColorAt(i, col.set(CAP_COLS[(x + y) % CAP_COLS.length]));
       boxes.push({
         minX: (x - HALF) * CELL - CELL / 2, maxX: (x - HALF) * CELL + CELL / 2,
         minZ: (y - HALF) * CELL - CELL / 2, maxZ: (y - HALF) * CELL + CELL / 2,
+        h: MAZE_H,
       });
     });
     walls.instanceMatrix.needsUpdate = true;
+    caps.instanceMatrix.needsUpdate = true;
+    if (caps.instanceColor) caps.instanceColor.needsUpdate = true;
   }
-  group.add(walls);
+  group.add(walls, caps);
 
   /* maze island slab + chocolate rim */
   const island = new THREE.Mesh(new THREE.BoxGeometry(GRID * CELL + 2.4, 0.08, GRID * CELL + 2.4),
@@ -315,55 +332,83 @@ export function createWorld(scene, keyLight) {
   sign(3.4, HALF * CELL + 4.2, 0.28, '🍭 The Maze', 'find the Star Candy');
   sign(-3.4, -HALF * CELL - 4.2, -0.28 + Math.PI, '🏔️ Ice Cream Peaks', '');
 
-  /* ---------------- lollipop forest ---------------- */
-  const LOOPS = 64;
-  const stemGeo = new THREE.CylinderGeometry(0.16, 0.2, 2.8, 10);
-  const topGeo = new THREE.SphereGeometry(0.78, 16, 12);
+  /* ---------------- lollipop forest (plump swirl lollipops) ---------------- */
+  const LOOPS = 84;
+  const stemGeo = new THREE.CylinderGeometry(0.15, 0.2, 1, 10);      /* unit height, scaled per instance */
+  const discGeo = new THREE.CylinderGeometry(0.85, 0.85, 0.26, 22);  /* flat swirl disc */
+  discGeo.rotateX(Math.PI / 2);
+  const rootGeo = new THREE.SphereGeometry(0.3, 10, 8);              /* candy at the base */
   const stems = new THREE.InstancedMesh(stemGeo, mat('#c9a06a', { roughness: 0.7 }), LOOPS);
-  const tops = new THREE.InstancedMesh(topGeo, new THREE.MeshStandardMaterial({ roughness: 0.35 }), LOOPS);
+  const tops = new THREE.InstancedMesh(discGeo, swirlMat, LOOPS);
+  const roots = new THREE.InstancedMesh(rootGeo, new THREE.MeshStandardMaterial({ roughness: 0.45 }), LOOPS);
   stems.castShadow = tops.castShadow = true;
   {
     const d = new THREE.Object3D();
     const col = new THREE.Color();
     const palette = ['#ff8fb7', '#f45d8e', '#ffd45e', '#4fc3ae', '#63b8f5', '#b57de0', '#ff9e4f'];
     let placed = 0, guard = 0;
-    while (placed < LOOPS && guard++ < 900) {
+    while (placed < LOOPS && guard++ < 1200) {
       const a = Math.random() * Math.PI * 2;
       const r = 24 + Math.random() * 22;
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (Math.abs(x) < 22 && Math.abs(z) < 22) continue;         // keep off the maze island
       if (z > 28 && z < 36 && Math.abs(x) < 48) continue;         // keep off the river
-      const s = 0.75 + Math.random() * 0.7;
-      d.position.set(x, 1.4 * s, z);
-      d.scale.setScalar(s);
-      d.rotation.set(0, 0, (Math.random() - 0.5) * 0.14);
+      const s = 0.75 + Math.random() * 0.65;
+      const h = (1.35 + Math.random() * 0.9) * s;                 /* plump, not towering */
+      const yaw = Math.random() * Math.PI * 2;
+      const lean = (Math.random() - 0.5) * 0.12;
+      /* stem */
+      d.position.set(x, h / 2, z);
+      d.scale.set(s, h, s);
+      d.rotation.set(0, 0, lean);
       d.updateMatrix();
       stems.setMatrixAt(placed, d.matrix);
-      d.position.y = (2.8 + 0.55) * s;
+      /* swirl disc on top, facing a random direction */
+      d.position.set(x, h + 0.1, z);
+      d.scale.setScalar(s);
+      d.rotation.set(0, yaw, lean * 0.6);
       d.updateMatrix();
       tops.setMatrixAt(placed, d.matrix);
-      tops.setColorAt(placed, col.set(palette[(Math.random() * palette.length) | 0]));
+      /* gumdrop root at the base */
+      d.position.set(x, 0.16 * s, z);
+      d.scale.set(s, s * 0.75, s);
+      d.rotation.set(0, 0, 0);
+      d.updateMatrix();
+      roots.setMatrixAt(placed, d.matrix);
+      roots.setColorAt(placed, col.set(palette[(Math.random() * palette.length) | 0]));
       circles.push({ x, z, r: 0.42 * s });
       placed++;
     }
-    stems.count = tops.count = placed;
+    stems.count = tops.count = roots.count = placed;
     stems.instanceMatrix.needsUpdate = true;
     tops.instanceMatrix.needsUpdate = true;
-    if (tops.instanceColor) tops.instanceColor.needsUpdate = true;
+    roots.instanceMatrix.needsUpdate = true;
+    if (roots.instanceColor) roots.instanceColor.needsUpdate = true;
   }
-  group.add(stems, tops);
+  group.add(stems, tops, roots);
 
-  /* giant lollipops (landmarks) */
+  /* giant lollipops (landmarks): swirl face + candy rim + base gumdrops */
   for (const [x, z, c] of [[-30, -14, '#f45d8e'], [30, -16, '#b57de0'], [-26, 26, '#63b8f5'], [27, 25, '#ffd45e']]) {
     const g = new THREE.Group();
-    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.42, 7, 12), mat('#fff6ec'));
-    stick.position.y = 3.5;
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.38, 4.2, 12), mat('#fff6ec', { roughness: 0.4 }));
+    stick.position.y = 2.1;
     stick.castShadow = true;
     g.add(stick);
-    const top = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 18), mat(c, { roughness: 0.3 }));
-    top.position.y = 7.6;
-    top.castShadow = true;
-    g.add(top);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.95, 1.95, 0.55, 26), swirlMat);
+    disc.rotation.x = Math.PI / 2;
+    disc.position.y = 4.35;
+    disc.castShadow = true;
+    g.add(disc);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(1.95, 0.12, 10, 32), mat(c, { roughness: 0.4 }));
+    rim.position.y = 4.35;
+    g.add(rim);
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * Math.PI * 2;
+      const gd = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), mat(k % 2 ? c : '#fff6ec', { roughness: 0.45 }));
+      gd.position.set(Math.cos(a) * 0.75, 0.16, Math.sin(a) * 0.75);
+      gd.scale.y = 0.8;
+      g.add(gd);
+    }
     g.position.set(x, 0, z);
     g.rotation.y = Math.random() * Math.PI;
     group.add(g);
@@ -575,7 +620,6 @@ export function createWorld(scene, keyLight) {
   /* ---------------- candy palace (north — lollipop towers, per the reference) ---------------- */
   {
     const castle = new THREE.Group();
-    const swirlMat = new THREE.MeshStandardMaterial({ map: swirlTex(), roughness: 0.35 });
     const wallMat = mat('#fdf3f0', { roughness: 0.55 });
     const icingMat = mat('#fff6f2', { roughness: 0.45 });
     const GUMDROPS = ['#f45d8e', '#63b8f5', '#ffd45e', '#a7d97a', '#b57de0', '#ff9e4f'];
@@ -718,7 +762,7 @@ export function createWorld(scene, keyLight) {
     });
 
     group.add(castle);
-    boxes.push({ minX: -4.3, maxX: 4.3, minZ: -44.7, maxZ: -43.3 });
+    boxes.push({ minX: -4.3, maxX: 4.3, minZ: -44.7, maxZ: -43.3, h: 5 });
   }
 
   /* ---------------- rainbow over the chocolate river ---------------- */
@@ -908,7 +952,7 @@ export function createWorld(scene, keyLight) {
     const bodyMat = mat('#4a3550', { roughness: 0.6 });
     const wingGeo = new THREE.CircleGeometry(0.17, 12);
     const wingColors = ['#ff8fb7', '#b57de0', '#63b8f5', '#ffd45e', '#a7d97a', '#ff9e4f', '#fff0f6'];
-    const N = 24;
+    const N = 34;
     for (let i = 0; i < N; i++) {
       const color = wingColors[i % wingColors.length];
       const wm = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
@@ -1894,6 +1938,122 @@ export function createWorld(scene, keyLight) {
       arcades.push({ id: 'race', label: 'Gummy Rush', pos: new THREE.Vector3(-16, 0, 22.5) });
     }
   }
+
+  /* ---------------- candy flora: dense flowers + bushes (walkpaths stay clear) ---------------- */
+  {
+    const distSeg = (ax, az, bx, bz, px, pz) => {
+      const dx = bx - ax, dz = bz - az;
+      const L2 = dx * dx + dz * dz || 1;
+      let t = ((px - ax) * dx + (pz - az) * dz) / L2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
+    };
+    const WP = [[-13, 25], [14, 20], [0, 32], [38, -20], [0, -38], [-27, -11]];
+    const blocked = (x, z, m) => {
+      if (Math.abs(x) < 21 && Math.abs(z) < 21) return true;        // maze island
+      if (z > 28.5 && z < 35.5) return true;                        // chocolate river
+      if (Math.abs(x) < 1.7 && z > 17 && z < 27.5) return true;     // cookie path
+      if (Math.hypot(x, z - 21) < 4.6) return true;                 // village green
+      if (Math.abs(x) < 5.5 && z < -34 && z > -44.5) return true;   // palace approach
+      if (z > 38) return true;                                      // ice-cream peaks
+      for (let i = 0; i < WP.length - 1; i++) {
+        if (distSeg(WP[i][0], WP[i][1], WP[i + 1][0], WP[i + 1][1], x, z) < 2.6) return true;
+      }
+      for (const c of circles) {
+        const rr = c.r + m;
+        if ((x - c.x) * (x - c.x) + (z - c.z) * (z - c.z) < rr * rr) return true;
+      }
+      for (const b of boxes) {
+        if (x > b.minX - m && x < b.maxX + m && z > b.minZ - m && z < b.maxZ + m) return true;
+      }
+      return false;
+    };
+
+    /* flowers: a candy meadow carpet (visual only — no colliders) */
+    const FL = 320;
+    const fstemGeo = new THREE.CylinderGeometry(0.02, 0.03, 0.3, 6);
+    const bloomGeo = new THREE.SphereGeometry(0.085, 8, 6);
+    const fstems = new THREE.InstancedMesh(fstemGeo, mat('#7fae62', { roughness: 0.8 }), FL);
+    const blooms = new THREE.InstancedMesh(bloomGeo, new THREE.MeshStandardMaterial({ roughness: 0.5 }), FL);
+    const BLOOM_COLS = ['#ff8fb7', '#f45d8e', '#ffd45e', '#fff6ec', '#b57de0', '#63b8f5', '#ff9e4f'];
+    {
+      const d = new THREE.Object3D();
+      const col = new THREE.Color();
+      let placed = 0, guard = 0;
+      while (placed < FL && guard++ < 4000) {
+        let x, z;
+        if (guard % 3 === 0) { /* village pockets */
+          x = -28 + Math.random() * 56;
+          z = 12 + Math.random() * 22;
+        } else { /* open meadow ring */
+          const a = Math.random() * Math.PI * 2;
+          const r = 22 + Math.random() * 24;
+          x = Math.cos(a) * r; z = Math.sin(a) * r;
+        }
+        if (blocked(x, z, 0.7)) continue;
+        const s = 0.8 + Math.random() * 0.7;
+        d.position.set(x, 0.15 * s, z);
+        d.scale.set(s, s, s);
+        d.rotation.set(0, 0, (Math.random() - 0.5) * 0.3);
+        d.updateMatrix();
+        fstems.setMatrixAt(placed, d.matrix);
+        d.position.set(x + (Math.random() - 0.5) * 0.05, 0.32 * s, z + (Math.random() - 0.5) * 0.05);
+        d.rotation.set(0, 0, 0);
+        d.updateMatrix();
+        blooms.setMatrixAt(placed, d.matrix);
+        blooms.setColorAt(placed, col.set(BLOOM_COLS[(Math.random() * BLOOM_COLS.length) | 0]));
+        placed++;
+      }
+      fstems.count = blooms.count = placed;
+      fstems.instanceMatrix.needsUpdate = true;
+      blooms.instanceMatrix.needsUpdate = true;
+      if (blooms.instanceColor) blooms.instanceColor.needsUpdate = true;
+    }
+    group.add(fstems, blooms);
+
+    /* candy bushes: plump pastel clusters with soft colliders */
+    const BUSH_N = 30;
+    const bushGeo = new THREE.SphereGeometry(0.5, 12, 10);
+    const bushes = new THREE.InstancedMesh(bushGeo, new THREE.MeshStandardMaterial({ roughness: 0.55 }), BUSH_N * 3);
+    const BUSH_COLS = ['#f7b8cf', '#c4dfa4', '#bcd4ee', '#e8d9f5', '#f9e3ae'];
+    {
+      const d = new THREE.Object3D();
+      const col = new THREE.Color();
+      let placed = 0, guard = 0, made = 0;
+      while (made < BUSH_N && guard++ < 900) {
+        let x, z;
+        if (guard % 3 === 0) {
+          x = -27 + Math.random() * 54;
+          z = 12 + Math.random() * 21;
+        } else {
+          const a = Math.random() * Math.PI * 2;
+          const r = 24 + Math.random() * 21;
+          x = Math.cos(a) * r; z = Math.sin(a) * r;
+        }
+        if (blocked(x, z, 1.4)) continue;
+        const cnt = 2 + (Math.random() * 2 | 0);
+        for (let k = 0; k < cnt && placed < BUSH_N * 3; k++) {
+          const ox = (Math.random() - 0.5) * 0.7, oz = (Math.random() - 0.5) * 0.7;
+          const s = 0.9 + Math.random() * 0.7;
+          d.position.set(x + ox, 0.24 * s, z + oz);
+          d.scale.set(s, s * 0.62, s);
+          d.rotation.set(0, 0, 0);
+          d.updateMatrix();
+          bushes.setMatrixAt(placed, d.matrix);
+          bushes.setColorAt(placed, col.set(BUSH_COLS[(Math.random() * BUSH_COLS.length) | 0]));
+          placed++;
+        }
+        circles.push({ x, z, r: 0.72, __bush: true });
+        made++;
+      }
+      bushes.count = placed;
+      bushes.instanceMatrix.needsUpdate = true;
+      if (bushes.instanceColor) bushes.instanceColor.needsUpdate = true;
+    }
+    bushes.castShadow = true;
+    group.add(bushes);
+  }
+
 
   /* ---------------- gummy rush race rings ---------------- */
   const racePath = [
