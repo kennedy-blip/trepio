@@ -14,7 +14,9 @@ full **candy palace** (lollipop-topped towers, gumdrop domes, icing trims,
 candy-cane gate) with **palace guards** stationed at the gate. **3.2** made
 the world lush and crowded: a candy-hedge maze, plump swirl lollipops, dense
 flower meadows and pastel candy bushes — with every walkpath kept clear — plus
-a free-tilt, wall-aware camera.
+a free-tilt, wall-aware camera. **3.3** went realistic: fbm-noise grass,
+bark-textured trees with swaying layered canopies, a flowing river, scattered
+rocks, worn stone village paths and a teal-to-peach golden-hour sky.
 
 Built with [three.js](https://threejs.org) — a single static page, playable
 offline. **Live at <https://trepio.vercel.app>**.
