@@ -1,5 +1,7 @@
 # 🍬 Trepio — The Candy Kingdom
 
+Documentation for the whole project can be found in the [Trepio Wiki](https://github.com/kennedy-blip/trepio.wiki.git).
+
 A handcrafted 3D **candy-fantasy kingdom** that runs entirely in your browser —
 no servers, no accounts, no downloads. Dress up your doll, step outside and
 explore a living little world: a candy-cane maze, lollipop forest, rainbow
